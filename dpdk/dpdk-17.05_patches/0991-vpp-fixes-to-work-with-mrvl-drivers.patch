@@ -1,0 +1,27 @@
+diff --git a/drivers/net/mrvl/mrvl_ethdev.c b/drivers/net/mrvl/mrvl_ethdev.c
+old mode 100644
+new mode 100755
+index bdc7480..deecc81
+--- a/drivers/net/mrvl/mrvl_ethdev.c
++++ b/drivers/net/mrvl/mrvl_ethdev.c
+@@ -692,6 +692,9 @@ static int mrvl_late_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+ 	uint64_t drop_mac = 0;
+ 	unsigned i, idx, ret;
+ 
++	/* Return, as this function causes VPP / DPDK to crash. */
++	return;
++
+ 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+ 		struct mrvl_rxq *rxq = dev->data->rx_queues[i];
+ 		struct pp2_ppio_inq_statistics rx_stats;
+@@ -822,6 +825,10 @@ static int mrvl_late_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+ 	info->default_rxconf.rx_drop_en = 1;
+ 
+ 	info->max_rx_pktlen = MRVL_PKT_SIZE_MAX;
++
++	info->speed_capa = ETH_LINK_SPEED_10M_HD | ETH_LINK_SPEED_10M |
++			ETH_LINK_SPEED_100M_HD | ETH_LINK_SPEED_100M |
++			ETH_LINK_SPEED_1G | ETH_LINK_SPEED_10G;
+ }
+ 
+ static const uint32_t *
