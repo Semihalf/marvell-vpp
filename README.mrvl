@@ -69,8 +69,9 @@ to the installation process.
 
 5. DPDK (Extract Marvell patches only)
 ------------------------------------------------
- - The actual DPDK sources will be downloaded and built as part of VPP
-   We are cloning DPDK sources from Marvell git in order to 
+ - The actual DPDK sources will be downloaded and built as part of VPP.
+   We are cloning Marvell's DPDK port, in order to extract required patches for adapting the mainline DPDK
+   to marvell network interfaces.
  - Clone Marvell's DPDK code
    # cd /root/
    # git clone https://github.com/MarvellEmbeddedProcessors/dpdk-marvell.git -b dpdk-17.05-armada-17.10 dpdk-marvell
@@ -97,15 +98,20 @@ to the installation process.
    # make build-release
  - Create VPP configuration file
    # cp src/scripts/mrvl/mrvl_demo_startup.conf /etc/vpp/startup.con
- - Run
-   # export STARTUP_CONF=/etc/vpp/startup.conf
-   # make run-release &
- - Connecting to VPP CLI:
-   # telent localhost 5002
+
 
 Running simple bridging setup
 -----------------------------
- - Connect to VPP CLI, and run:
+ - Load kernel modules
+   # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x_sysfs
+ - Hugepages configuration
+   # echo 1536 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+ - Run VPP
+   # export STARTUP_CONF=/etc/vpp/startup.conf
+   # make run-release &
+ - Connect to VPP CLI:
+   # telent localhost 5002
+ - (from CLI) create bridge, and associate 2 ports:
    # set interface state TenGigabitEthernet0 up
    # set interface state TenGigabitEthernet1 up
    # create bridge-domain 1
