@@ -216,7 +216,6 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	@# not needed
 	$(call set,RTE_LIBRTE_PMD_TAP,n)
 	$(call set,RTE_LIBRTE_TIMER,n)
-	$(call set,RTE_LIBRTE_CFGFILE,n)
 	$(call set,RTE_LIBRTE_LPM,n)
 	$(call set,RTE_LIBRTE_ACL,n)
 	$(call set,RTE_LIBRTE_POWER,n)
