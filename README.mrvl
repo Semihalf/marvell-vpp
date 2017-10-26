@@ -21,7 +21,7 @@ to the installation process.
    # apt-get install git openssh-server make bc
    # apt-get install autoconf automake libtool
    # apt-get install ccache 
-   # (optional) apt-get install xterm socat zip
+   # (optional) apt-get install xterm socat zip telnet
 
 3. MUSDK (part 1)
 -----------------
@@ -54,12 +54,13 @@ to the installation process.
    # make -j4
    # make install
  - Build & install MUSDK modules
-   # cd src/modules/
+   # cd modules/
    # for i in dmax2 neta pp2 sam uio; do cd $i; make; make -C $KDIR M=`pwd` modules_install; cd -; done
 
 5. pp2-sysfs driver
 -------------------
- - Download mvpp2x-sysfs driver, and extract under /root/sysfs
+ - Clone mvpp2-sysfs source code from github
+   # git clone https://github.com/MarvellEmbeddedProcessors/mvpp2x-marvell.git -b mvpp2x-armada-17.10 sysfs
  - Build and install
    # cd /root/sysfs/
    # cp Makefile_sysfs Makefile
@@ -83,34 +84,35 @@ to the installation process.
 6. VPP
 ------
  - Clone Marvell's VPP port
-   # git clone <TBD>
+   # cd /root/
+   # git clone https://github.com/MarvellEmbeddedProcessors/vpp-marvell.git -b vpp-devel vpp-marvell
  - Prepare build env
    # cd vpp-marvell/
    # export DPDK_VERSION=17.05
    # export AESNI=n
    # export LIBMUSDK_PATH=/usr/
-   # make bootstrap 
    # make install-dep
+   # make bootstrap 
    # groupadd vpp
  - Copy DPDK patches:
    # cp /root/dpdk-patches/* dpdk/dpdk-17.05_patches/
  - Build vpp:
-   # make build-release
+   # make -j4 build-release
  - Create VPP configuration file
-   # cp src/scripts/mrvl/mrvl_demo_startup.conf /etc/vpp/startup.con
+   # cp src/scripts/mrvl/mrvl_demo_startup.conf /etc/vpp/startup.conf
 
 
 Running simple bridging setup
 -----------------------------
  - Load kernel modules
-   # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x_sysfs
+   # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x
  - Hugepages configuration
    # echo 1536 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
  - Run VPP
    # export STARTUP_CONF=/etc/vpp/startup.conf
    # make run-release &
  - Connect to VPP CLI:
-   # telent localhost 5002
+   # telnet localhost 5002
  - (from CLI) create bridge, and associate 2 ports:
    # set interface state TenGigabitEthernet0 up
    # set interface state TenGigabitEthernet1 up
