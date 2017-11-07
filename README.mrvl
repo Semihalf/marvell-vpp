@@ -4,8 +4,8 @@ The document below specifies the exact versions used for reproducing the system,
 versions of these software components might be used, although, this might require some slight modifications
 to the installation process.
 
-1. Hardware:
-------------
+1. Hardware
+-----------
  - Armada-7/8K development / community board.
    (For the purpose of this readme, a 8040-McBin board was used).
  - Traffic generator (connected through the 10G ports).
@@ -20,7 +20,7 @@ to the installation process.
  - The following packages will be required during the installation process:
    # apt-get install git openssh-server make bc
    # apt-get install autoconf automake libtool
-   # apt-get install ccache 
+   # apt-get install ccache
    # (optional) apt-get install xterm socat zip telnet
 
 3. MUSDK (part 1)
@@ -43,8 +43,9 @@ to the installation process.
    # make modules_install
    # make install
    # cp arch/arm64/boot/Image arch/arm64/boot/dts/marvell/armada-8040-mcbin.dtb /boot/
+ -  Reboot the board using the Kernel and DTB compiled above.
 
-4. MUSDK (part 2)
+5. MUSDK (part 2)
 -----------------
  - Configure & build musdk libraries / applications
    # cd /root/musdk-marvell
@@ -57,9 +58,10 @@ to the installation process.
    # cd modules/
    # for i in dmax2 neta pp2 sam uio; do cd $i; make; make -C $KDIR M=`pwd` modules_install; cd -; done
 
-5. pp2-sysfs driver
+6. pp2-sysfs driver
 -------------------
  - Clone mvpp2-sysfs source code from github
+   # cd /root/
    # git clone https://github.com/MarvellEmbeddedProcessors/mvpp2x-marvell.git -b mvpp2x-armada-17.10 pp2_sysfs
  - Build and install
    # cd /root/pp2_sysfs/sysfs/
@@ -69,8 +71,8 @@ to the installation process.
    # make
    # make -C $KDIR M=`pwd` modules_install
 
-5. DPDK (Extract Marvell patches only)
-------------------------------------------------
+7. DPDK (Extract Marvell patches only)
+--------------------------------------
  - The actual DPDK sources will be downloaded and built as part of VPP.
    We are cloning Marvell's DPDK port, in order to extract required patches for adapting the mainline DPDK
    to marvell network interfaces.
@@ -82,7 +84,7 @@ to the installation process.
    # cd dpdk-marvell
    # git format-patch 2225554..HEAD -o /root/dpdk-patches/
 
-6. VPP
+8. VPP
 ------
  - Clone Marvell's VPP port
    # cd /root/
@@ -93,29 +95,29 @@ to the installation process.
    # export AESNI=n
    # export LIBMUSDK_PATH=/usr/
    # make install-dep
-   # make bootstrap 
+   # make bootstrap
    # groupadd vpp
  - Copy DPDK patches:
    # cp /root/dpdk-patches/* dpdk/dpdk-17.05_patches/
  - Build vpp:
    # make -j4 build-release
  - Create VPP configuration file
+   # mkdir -p /etc/vpp/
    # cp src/scripts/mrvl/mrvl_demo_startup.conf /etc/vpp/startup.conf
-
 
 Running simple bridging setup (between eth0 & eth1 on McBin board)
 -----------------------------
  - Load kernel modules
    # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x_sysfs
 - Hugepages configuration
-   # echo 1536 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+   # echo 1000 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
  - Run VPP
    # export STARTUP_CONF=/etc/vpp/startup.conf
    # make run-release &
    # ifconfig eth0 up
    # ifconfig eth1 up
  - Connect to VPP CLI:
-   # telnet localhost 5002
+   # telnet 127.0.0.1 5002
  - (from CLI) create bridge, and associate 2 ports:
    # set interface state TenGigabitEthernet0 up
    # set interface state TenGigabitEthernet1 up
