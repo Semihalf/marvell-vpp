@@ -112,6 +112,7 @@ Running simple bridging setup (between eth0 & eth1 on McBin board)
 - Hugepages configuration
    # echo 1000 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
  - Run VPP
+   # cd /root/vpp-marvell/
    # export STARTUP_CONF=/etc/vpp/startup.conf
    # make run-release &
    # ifconfig eth0 up
