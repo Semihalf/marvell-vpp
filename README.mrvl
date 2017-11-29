@@ -126,3 +126,117 @@ Running simple bridging setup (between eth0 & eth1 on McBin board)
    # set interface l2 bridge TenGigabitEthernet0 1
    # set interface l2 bridge TenGigabitEthernet1 1
 
+
+
+Running bridging inside VM (eth0->vm(eth0)->vm(eth1)->eth1)
+-----------------------------
+ - Load kernel modules
+   # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x_sysfs
+ - Hugepages configuration
+   # echo 1000 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+ - Run VPP
+   # cd /root/vpp-marvell/
+   # export STARTUP_CONF=/etc/vpp/startup.conf
+   # make run-release &
+   # ifconfig eth0 up
+   # ifconfig eth1 up
+ - Connect to VPP CLI:
+   # telnet 127.0.0.1 5002
+ - (from CLI) create vhost ports:
+   # create vhost socket /tmp/sock1.sock server feature-mask 0xFF
+   # create vhost socket /tmp/sock2.sock server feature-mask 0xFF
+ - (from CLI) link up all ports:
+   # set interface state TenGigabitEthernet0 up
+   # set interface state TenGigabitEthernet1 up
+   # set interface state VirtualEthernet0/0/0 up
+   # set interface state VirtualEthernet0/0/1 up
+ - setup the bridge domains:
+   # set interface l2 bridge TenGigabitEthernet0  1
+   # set interface l2 bridge VirtualEthernet0/0/0 1
+   # set interface l2 bridge TenGigabitEthernet1  2
+   # set interface l2 bridge VirtualEthernet0/0/1 2
+
+ VPP is configured. Now we need to boot a VM to bridge between VirtualEthernet0/0/0 and VirtualEthernet0/0/1
+ quit VPP using #quit and continue
+
+ - VM environment setup
+    - Install QEMU and screen
+	# apt-get install qemu-system-aarch64 screen python
+
+    - Prepare VM linux image
+       # cd /root/linux-marvell
+       # git am /root/ovs-marvell/linux-guest-patches/*
+       # ./scripts/config -e VFIO_NOIOMMU
+       # ./scripts/config -e VFIO_NOIOMMU
+       # make -j6
+       # cp arch/arm64/boot/Image /boot/Image-vm
+
+    - Prepare ubuntu-16.04 file system image for the guest VM
+       # dd if=/dev/zero of=/root/ubuntu-16.04-vm-fs.img bs=1M count=2000
+       # mkfs.ext4 /root/ubuntu-16.04-vm-fs.img
+       # mkdir /mnt/loop
+       # mount /root/ubuntu-16.04-vm-fs.img /mnt/loop
+       # cd /mnt/loop
+       # tar -xf /root/ubuntu-16.04-arm64.tar
+       # cp /root/dpdk-marvell /mnt/loop/root/.
+
+    - Install packages for VM file system
+       # chroot /mnt/loop
+       # dhclient eth2
+       # apt-get update
+       # apt-get install build-essential pciutils
+
+    - Compile DPDK for VM
+      - Disable KNI and MRVL PMD in config file
+         - open config/common_linuxapp and delete CONFIG_RTE_KNI_KMOD
+         - open config/common_base and delete
+	    - CONFIG_RTE_LIBRTE_MRVL_PMD
+	    - CONFIG_RTE_LIBRTE_MRVL_DEBUG
+	    - CONFIG_RTE_MRVL_MUSDK_DMA_MEMSIZE
+	    - CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO
+	    - CONFIG_RTE_LIBRTE_PMD_MRVL_CRYPTO_DEBUG
+      - Build DPDK
+	 # make config T=arm64-armv8a-linuxapp-gcc
+	 # make
+	 # make install
+
+   10.5 Boot the VM
+      - Start screen application and create a 2nd terminal
+	   # screen
+           # Ctrl-a c   " open 2nd terminal "
+	   # Ctrl-a 1   " switch to 2nd terminal"
+      - Boot VM with QEMU
+	   # qemu-system-aarch64 -enable-kvm -nographic -kernel /boot/Image-vm -m 768 -M virt,iommu=on -cpu host -smp 2\
+	        -drive file=/root/ubuntu-16.04-vm-fs.img,id=fs,if=none,format=raw -device virtio-blk-device,drive=fs \
+	        -chardev socket,id=char0,path=/tmp/sock1.sock \
+	        -netdev type=vhost-user,id=net0,chardev=char0,vhostforce  \
+	        -device virtio-net-pci,mac=00:00:00:00:00:10,netdev=net0 \
+	        -chardev socket,id=char1,path=/tmp/sock2.sock \
+	        -netdev type=vhost-user,id=net1,chardev=char1,vhostforce \
+	        -device virtio-net-pci,mac=00:00:00:00:00:11,netdev=net1 \
+	        -object memory-backend-file,share=on,id=mem,size=768M,mem-path=/dev/hugepages \
+	        -numa node,memdev=mem -mem-prealloc \
+	        -append "earlyprintk console=ttyAMA0 isolcpus=1 rootwait root=/dev/vda rw"
+
+       - Verify Virtio PCI devices exist. lspci should show
+		00:00.0 Host bridge: Red Hat, Inc. Device 0008
+		00:01.0 Ethernet controller: Red Hat, Inc Virtio network device
+		00:02.0 Ethernet controller: Red Hat, Inc Virtio network device
+
+    10.6 Run DPDK on VM
+       - system setup
+          # init s  /*  to eliminate un-needed processes from ubuntu */
+	  # echo 1024 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+          # mkdir /mnt/huge
+          # mount -t hugetlbfs nodev /mnt/huge
+          # echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode
+          # dpdk-devbind -b vfio-pci 0000:00:01.0
+          # dpdk-devbind -b vfio-pci 0000:00:02.0
+
+       - dpdk run
+          # testpmd -c 0x3 -- -i -a --total-num-mbufs=16384
+
+     The system is now ready to bridge traffic.
+     Back on the hypervisor, check that you have 2 threads occupying 100% CPU.
+     Make sure none of these threads is running on CPU-0. If one of them does,
+     move it to CPUs 1,2, or 3 using taskset.
