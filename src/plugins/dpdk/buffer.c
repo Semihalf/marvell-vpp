@@ -476,7 +476,9 @@ dpdk_pool_create (vlib_main_t * vm, u8 * pool_name, u32 elt_size,
 #endif
 
   error =
-    vlib_physmem_region_alloc (vm, (i8 *) pool_name, size, numa, 0, pri);
+    vlib_physmem_region_alloc (vm, (i8 *) pool_name, size, numa,
+			       VLIB_PHYSMEM_F_HUGETLB | VLIB_PHYSMEM_F_SHARED,
+			       pri);
   if (error)
     return error;
 
