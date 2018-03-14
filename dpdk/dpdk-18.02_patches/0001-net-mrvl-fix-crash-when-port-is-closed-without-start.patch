@@ -1,0 +1,28 @@
+From 30668fb8835e90932fad6c8c7bdb748ab9727c0b Mon Sep 17 00:00:00 2001
+From: Natalie Samsonov <nsamsono@marvell.com>
+Date: Mon, 8 Jan 2018 21:10:39 +0200
+Subject: [PATCH 01/11] net/mrvl: fix crash when port is closed without
+ starting
+
+Signed-off-by: Natalie Samsonov <nsamsono@marvell.com>
+---
+ drivers/net/mrvl/mrvl_ethdev.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvl/mrvl_ethdev.c b/drivers/net/mrvl/mrvl_ethdev.c
+index 705c4bd..3611a92 100644
+--- a/drivers/net/mrvl/mrvl_ethdev.c
++++ b/drivers/net/mrvl/mrvl_ethdev.c
+@@ -686,7 +686,8 @@ mrvl_dev_stop(struct rte_eth_dev *dev)
+ 		pp2_cls_qos_tbl_deinit(priv->qos_tbl);
+ 		priv->qos_tbl = NULL;
+ 	}
+-	pp2_ppio_deinit(priv->ppio);
++	if (priv->ppio)
++		pp2_ppio_deinit(priv->ppio);
+ 	priv->ppio = NULL;
+ }
+ 
+-- 
+2.7.4
+
