@@ -1,0 +1,137 @@
+From 544a85863e065be55f3d8edace348defa0e17e64 Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Wed, 6 Dec 2017 12:26:36 +0100
+Subject: [PATCH 08/11] net/mrvl: add rx flow control
+
+Add rx side flow control support.
+
+Signed-off-by: Natalie Samsonov <nsamsono@marvell.com>
+---
+ doc/guides/nics/features/mrvl.ini |  1 +
+ doc/guides/nics/mrvl.rst          |  1 +
+ drivers/net/mrvl/mrvl_ethdev.c    | 78 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 80 insertions(+)
+
+diff --git a/doc/guides/nics/features/mrvl.ini b/doc/guides/nics/features/mrvl.ini
+index 120fd4d..8673a56 100644
+--- a/doc/guides/nics/features/mrvl.ini
++++ b/doc/guides/nics/features/mrvl.ini
+@@ -13,6 +13,7 @@ Allmulticast mode    = Y
+ Unicast MAC filter   = Y
+ Multicast MAC filter = Y
+ RSS hash             = Y
++Flow control         = Y
+ VLAN filter          = Y
+ CRC offload          = Y
+ L3 checksum offload  = Y
+diff --git a/doc/guides/nics/mrvl.rst b/doc/guides/nics/mrvl.rst
+index 7678265..550bd79 100644
+--- a/doc/guides/nics/mrvl.rst
++++ b/doc/guides/nics/mrvl.rst
+@@ -72,6 +72,7 @@ Features of the MRVL PMD are:
+ - Basic stats
+ - Extended stats
+ - QoS
++- RX flow control
+ 
+ 
+ Limitations
+diff --git a/drivers/net/mrvl/mrvl_ethdev.c b/drivers/net/mrvl/mrvl_ethdev.c
+index 2e91139..606be06 100644
+--- a/drivers/net/mrvl/mrvl_ethdev.c
++++ b/drivers/net/mrvl/mrvl_ethdev.c
+@@ -1723,6 +1723,82 @@ mrvl_tx_queue_release(void *txq)
+ }
+ 
+ /**
++ * DPDK callback to get flow control configuration.
++ *
++ * @param dev
++ *  Pointer to Ethernet device structure.
++ * @param fc_conf
++ *  Pointer to the flow control configuration.
++ *
++ * @return
++ *  0 on success, negative error value otherwise.
++ */
++static int
++mrvl_flow_ctrl_get(struct rte_eth_dev *dev, struct rte_eth_fc_conf *fc_conf)
++{
++	struct mrvl_priv *priv = dev->data->dev_private;
++	int ret, en;
++
++	if (!priv)
++		return -EPERM;
++
++	ret = pp2_ppio_get_rx_pause(priv->ppio, &en);
++	if (ret) {
++		RTE_LOG(ERR, PMD, "Failed to read rx pause state\n");
++		return ret;
++	}
++
++	fc_conf->mode = en ? RTE_FC_RX_PAUSE : RTE_FC_NONE;
++
++	return 0;
++}
++
++/**
++ * DPDK callback to set flow control configuration.
++ *
++ * @param dev
++ *  Pointer to Ethernet device structure.
++ * @param fc_conf
++ *  Pointer to the flow control configuration.
++ *
++ * @return
++ *  0 on success, negative error value otherwise.
++ */
++static int
++mrvl_flow_ctrl_set(struct rte_eth_dev *dev, struct rte_eth_fc_conf *fc_conf)
++{
++	struct mrvl_priv *priv = dev->data->dev_private;
++
++	if (!priv)
++		return -EPERM;
++
++	if (fc_conf->high_water ||
++	    fc_conf->low_water ||
++	    fc_conf->pause_time ||
++	    fc_conf->mac_ctrl_frame_fwd ||
++	    fc_conf->autoneg) {
++		RTE_LOG(ERR, PMD, "Flowctrl parameter is not supported\n");
++
++		return -EINVAL;
++	}
++
++	if (fc_conf->mode == RTE_FC_NONE ||
++	    fc_conf->mode == RTE_FC_RX_PAUSE) {
++		int ret, en;
++
++		en = fc_conf->mode == RTE_FC_NONE ? 0 : 1;
++		ret = pp2_ppio_set_rx_pause(priv->ppio, en);
++		if (ret)
++			RTE_LOG(ERR, PMD,
++				"Failed to change flowctrl on RX side\n");
++
++		return ret;
++	}
++
++	return 0;
++}
++
++/**
+  * Update RSS hash configuration
+  *
+  * @param dev
+@@ -1929,6 +2005,8 @@ static const struct eth_dev_ops mrvl_ops = {
+ 	.rx_queue_release = mrvl_rx_queue_release,
+ 	.tx_queue_setup = mrvl_tx_queue_setup,
+ 	.tx_queue_release = mrvl_tx_queue_release,
++	.flow_ctrl_get = mrvl_flow_ctrl_get,
++	.flow_ctrl_set = mrvl_flow_ctrl_set,
+ 	.rss_hash_update = mrvl_rss_hash_update,
+ 	.rss_hash_conf_get = mrvl_rss_hash_conf_get,
+ 	.filter_ctrl = mrvl_eth_filter_ctrl,
+-- 
+2.7.4
+
