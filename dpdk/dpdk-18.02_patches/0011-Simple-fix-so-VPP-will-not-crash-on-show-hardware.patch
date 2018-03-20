@@ -1,7 +1,7 @@
 From c9d2beea7348ba3859611ae31dcc5365d0c90a00 Mon Sep 17 00:00:00 2001
 From: Szymon Sliwa <szs@semihalf.com>
 Date: Tue, 13 Mar 2018 13:54:20 +0100
-Subject: [PATCH 11/11] Simple fix so VPP will not crash on `show hardware`
+Subject: [PATCH 11/12] Simple fix so VPP will not crash on `show hardware`
 
 ---
  drivers/net/mrvl/mrvl_ethdev.c | 3 +++
