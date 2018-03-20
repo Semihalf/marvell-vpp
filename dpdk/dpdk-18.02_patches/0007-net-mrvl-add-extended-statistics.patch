@@ -1,7 +1,7 @@
 From efdd61c7f09c3a0328f5788105e7d6584ece73aa Mon Sep 17 00:00:00 2001
 From: Tomasz Duszynski <tdu@semihalf.com>
 Date: Wed, 8 Nov 2017 11:35:08 +0100
-Subject: [PATCH 07/11] net/mrvl: add extended statistics
+Subject: [PATCH 07/12] net/mrvl: add extended statistics
 
 Add extended statistics implementation.
 
