@@ -1,7 +1,7 @@
 From 6c81731e46d218fdfcd5cd36c6b64b250ff6f1e9 Mon Sep 17 00:00:00 2001
 From: Szymon Sliwa <szs@semihalf.com>
 Date: Tue, 6 Mar 2018 17:45:05 +0100
-Subject: [PATCH 10/11] tmp env set
+Subject: [PATCH 10/12] tmp env set
 
 ---
  patch_it_all.sh | 5 +++++

@@ -1,7 +1,7 @@
 From 30668fb8835e90932fad6c8c7bdb748ab9727c0b Mon Sep 17 00:00:00 2001
 From: Natalie Samsonov <nsamsono@marvell.com>
 Date: Mon, 8 Jan 2018 21:10:39 +0200
-Subject: [PATCH 01/11] net/mrvl: fix crash when port is closed without
+Subject: [PATCH 01/12] net/mrvl: fix crash when port is closed without
  starting
 
 Signed-off-by: Natalie Samsonov <nsamsono@marvell.com>
