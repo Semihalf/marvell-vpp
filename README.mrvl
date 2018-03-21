@@ -51,7 +51,7 @@ to the installation process.
    # cd /root/musdk-marvell
    # export KDIR=/root/linux-marvell
    # ./bootstrap
-   # ./configure --enable-shared --enable-bpool-dma=64 --enable-bpool-cookie=32 --enable-sam --prefix=/usr
+   # ./configure --enable-shared --enable-bpool-dma=64 --enable-sam --prefix=/usr
    # make -j4
    # make install
  - Build & install MUSDK modules
@@ -73,32 +73,23 @@ to the installation process.
 
 7. DPDK (Extract Marvell patches only)
 --------------------------------------
- - The actual DPDK sources will be downloaded and built as part of VPP.
-   We are cloning Marvell's DPDK port, in order to extract required patches for adapting the mainline DPDK
-   to marvell network interfaces.
- - Clone Marvell's DPDK code
-   # cd /root/
-   # git clone https://github.com/MarvellEmbeddedProcessors/dpdk-marvell.git -b dpdk-17.05-armada-17.10 dpdk-marvell
- - Extract Marvell's patches on top of mainline DPDK
-   # mkdir /root/dpdk-patches/
-   # cd dpdk-marvell
-   # git format-patch 2225554..HEAD -o /root/dpdk-patches/
+   The patches are boundled within the current repositiory.
+   Updated this part of instruction after development.
 
 8. VPP
 ------
  - Clone Marvell's VPP port
    # cd /root/
-   # git clone https://github.com/MarvellEmbeddedProcessors/vpp-marvell.git -b vpp-devel vpp-marvell
+   ASDFASDFAS
+   git clone https://github.com/Semihalf/marvell-vpp.git -b mrvl_on_master_19_03
  - Prepare build env
-   # cd vpp-marvell/
-   # export DPDK_VERSION=17.05
+   # cd marvell-vpp/
+   # export DPDK_VERSION=18.02
    # export AESNI=n
    # export LIBMUSDK_PATH=/usr/
    # make install-dep
    # make bootstrap
    # groupadd vpp
- - Copy DPDK patches:
-   # cp /root/dpdk-patches/* dpdk/dpdk-17.05_patches/
  - Build vpp:
    # make -j4 build-release
  - Create VPP configuration file
@@ -109,10 +100,12 @@ Running simple bridging setup (between eth0 & eth1 on McBin board)
 -----------------------------
  - Load kernel modules
    # modprobe -a musdk_uio mv_dmax2_uio mv_pp_uio mv_sam_uio mvpp2x_sysfs
+   if IPsec is going to be tested
+   # insmod /lib/modules/4.4.52-armada-17.10.3-g84fb82a/kernel/drivers/crypto/inside-secure/crypto_safexcel.ko rings=0,0
 - Hugepages configuration
    # echo 1000 > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
  - Run VPP
-   # cd /root/vpp-marvell/
+   # cd /root/vpp/
    # export STARTUP_CONF=/etc/vpp/startup.conf
    # make run-release &
    # ifconfig eth0 up
@@ -240,3 +233,41 @@ Running bridging inside VM (eth0->vm(eth0)->vm(eth1)->eth1)
      Back on the hypervisor, check that you have 2 threads occupying 100% CPU.
      Make sure none of these threads is running on CPU-0. If one of them does,
      move it to CPUs 1,2, or 3 using taskset.
+
+9. Troubleshooting
+---------------------
+The issues will be described here to possibly save time of future developers:
+
+Current:
+    1) VPP crashes if you add non existent SA to a SPD, this is
+       an issue of VPP (probably)
+    2) VPP is unable to bind MRVL crypto driver, as the capabilities do not
+       match - MRVL crypto driver is as of now, not able to truncate the
+       digest. This results in (silent) error on SA creation, and likely
+       leads to the crash described in 1)
+    3) "[ERROR] Dma object already exits. " - this appears at startup,
+       what is it, does it harm us?
+    4) Sometimes the interface TX stays down for unknown reasons,
+       then sometimes it starts working out of the blue, other
+       times it requires to reboot the board (this always helps)
+    5) If more than one worker thread is used, it is required to
+       change the socket-mem parameter in startup.conf, other wise
+       application will crash due to insufficient memory
+
+
+Other issues which have been solved by changing the base,
+if the baseline is going to change, watch out for those:
+    1) In 03.2018 there have been some changes in how the
+       IOVA table is filled, VPP did not work before that
+       changes due to IOMMU misconfiguration or something.
+       The packets were received, the pointer to pkt
+       data pointed to a place in memory which only had `0`
+       in it.
+       I believe this commit made it work:
+            https://gerrit.fd.io/r/#/c/11063/
+       but I am not entirely sure.
+    2) VPP tried to get the stats of a port before initializing it
+       Changes to if it were upstreamed:
+            https://gerrit.fd.io/r/#/c/11144/
+
+
