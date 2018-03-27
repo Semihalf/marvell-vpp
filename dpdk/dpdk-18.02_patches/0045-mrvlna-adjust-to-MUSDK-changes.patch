@@ -1,0 +1,38 @@
+From 096702d48d368906cc16ad43f4426d7a4d401c74 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 12 Mar 2018 14:35:42 +0100
+Subject: [PATCH 45/74] mrvlna: adjust to MUSDK changes
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 8ab0a86..68eca9f 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -345,11 +345,7 @@ mrvlna_neta_deinit(void)
+ static int
+ mrvlna_neta_init(void)
+ {
+-	struct neta_init_params init_params;
+-
+-	memset(&init_params, 0, sizeof(init_params));
+-
+-	return neta_init(&init_params);
++	return neta_init();
+ }
+ 
+ /**
+@@ -959,7 +955,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	int ret = 0, i;
+ 
+ 	priv->ppio_id = dev->data->port_id;
+-	snprintf(match, sizeof(match), "neta-%d", priv->ppio_id);
++	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
+ 	priv->ppio_params.match = match;
+ 	priv->ppio_params.inqs_params.mtu = 1500;
+ 
+-- 
+2.7.4
+

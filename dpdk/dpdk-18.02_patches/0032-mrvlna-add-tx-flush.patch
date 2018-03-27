@@ -1,0 +1,228 @@
+From d6f77d87c5d3fc6a135caef9c8d62f5889ba18d7 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 1 Mar 2018 16:00:45 +0100
+Subject: [PATCH 32/74] mrvlna: add tx flush
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 116 ++++++++++++++++++++++++++++++++++---
+ drivers/net/mrvlna/mrvlna_ethdev.h |  10 ++--
+ 2 files changed, 113 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index b11fe09..7716131 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -96,7 +96,7 @@ struct neta_shadow_txq {
+ 	int tail;           /* read index - used when releasing buffers */
+ 	u16 size;           /* queue occupied size */
+ 	u16 num_to_release; /* number of buffers sent, that can be released */
+-	struct buff_release_entry ent[MRVL_NETA_TX_SHADOWQ_SIZE]; /* q entries */
++	struct neta_buff_inf ent[MRVL_NETA_TX_SHADOWQ_SIZE]; /* q entries */
+ };
+ 
+ 
+@@ -121,6 +121,7 @@ struct neta_txq {
+ 	uint64_t bytes_sent;
+ 	struct neta_shadow_txq shadow_txqs[RTE_MAX_LCORE];
+ 	int tx_deferred_start;
++	uint32_t qlen_mask;
+ };
+ 
+ static int mrvlna_dev_num;
+@@ -168,11 +169,11 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+  * Return mbufs to mempool.
+  */
+ static void
+-mrvlna_free_buffs(struct neta_priv *priv, struct neta_ppio_desc *desc)
++mrvlna_free_buffs(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+ {
+ 	uint64_t addr;
+ 	uint8_t i;
+-	uint64_t size = priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size;
++	uint64_t size = rxq->size;
+ 
+ 	for (i = 0; i < size; i++) {
+ 		if (desc) {
+@@ -185,14 +186,72 @@ mrvlna_free_buffs(struct neta_priv *priv, struct neta_ppio_desc *desc)
+ }
+ 
+ /**
+- * Flush receive single queue.
++ * Release already sent buffers to bpool (buffer-pool).
++ *
++ * @param ppio
++ *   Pointer to the port structure.
++ * @param hif
++ *   Pointer to the MUSDK hardware interface.
++ * @param sq
++ *   Pointer to the shadow queue.
++ * @param qid
++ *   Queue id number.
++ * @param force
++ *   Force releasing packets.
++ */
++static inline void
++mrvlna_free_sent_buffers(struct neta_ppio *ppio,
++		struct neta_shadow_txq *sq, int qid,
++		uint32_t qlen_mask, int force)
++{
++	struct neta_buff_inf *entry;
++	uint16_t nb_done = 0;
++	int i;
++	int tail = sq->tail;
++
++	neta_ppio_get_num_outq_done(ppio, qid, &nb_done);
++
++	sq->num_to_release += nb_done;
++
++	if (likely(!force &&
++		   sq->num_to_release < MRVL_NETA_BUF_RELEASE_BURST_SIZE))
++		return;
++
++	nb_done = sq->num_to_release;
++	sq->num_to_release = 0;
++
++	for (i = 0; i < nb_done; i++) {
++		entry = &sq->ent[tail];
++
++		if (unlikely(!entry->addr)) {
++			RTE_LOG(ERR, PMD,
++				"Shadow memory @%d: cookie(%lx), pa(%lx)!\n",
++				sq->tail, (u64)entry->cookie,
++				(u64)entry->addr);
++			tail = (tail + 1) & qlen_mask;;
++			continue;
++		}
++
++		struct rte_mbuf *mbuf;
++
++		mbuf = (struct rte_mbuf *)
++			   (cookie_addr_high | entry->cookie);
++		rte_pktmbuf_free(mbuf);
++		tail = (tail + 1) & qlen_mask;
++	}
++
++	sq->tail = tail;
++	sq->size -= nb_done;
++}
++
++/**
++ * Flush single receive queue.
+  *
+  * @param rxq
+  *   Pointer to rx queue structure.
+  * @param descs
+  *   Array of rx descriptors
+  */
+-
+ static void
+ mrvlna_flush_rx_queue(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ {
+@@ -204,6 +263,39 @@ mrvlna_flush_rx_queue(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ 					rxq->queue_id,
+ 					descs, (uint16_t *)&num);
+ 	} while (ret == 0 && num);
++
++	mrvlna_free_buffs(rxq, descs);
++}
++
++/**
++ * Flush single transmit queue.
++ *
++ * @param txq
++ *     Pointer to tx queue structure
++ */
++static void
++mrvlna_tx_queue_flush(struct neta_txq *txq)
++{
++	int i;
++	uint32_t qlen_mask = txq->qlen_mask;
++
++	for (i = 0; i < RTE_MAX_LCORE; i++) {
++		struct neta_shadow_txq *sq;
++
++		sq = &txq->shadow_txqs[i];
++		mrvlna_free_sent_buffers(txq->priv->ppio,
++				sq, txq->queue_id, qlen_mask, 1);
++
++		/* free the rest of them */
++		while (sq->tail != sq->head) {
++			uint64_t addr = cookie_addr_high |
++				sq->ent[sq->tail].cookie;
++			rte_pktmbuf_free(
++				(struct rte_mbuf *)addr);
++			sq->tail = (sq->tail + 1) & qlen_mask;
++		}
++		memset(sq, 0, sizeof(*sq));
++	}
+ }
+ 
+ /**
+@@ -525,6 +617,7 @@ mrvlna_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	txq->queue_id = idx;
+ 	txq->port_id = dev->data->port_id;
+ 	txq->tx_deferred_start = conf->tx_deferred_start;
++	txq->qlen_mask = desc - 1;
+ 	dev->data->tx_queues[idx] = txq;
+ 
+ 	priv->ppio_params.outqs_params.outqs_params[idx].size = desc;
+@@ -613,6 +706,8 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ //	return ret;
+ }
+ 
++
++
+ /**
+  * DPDK callback to stop the device.
+  *
+@@ -625,18 +720,23 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 	struct neta_priv *priv = dev->data->dev_private;
+ 	int i;
+ 
+-	//TODO flush tx queues
+-
+ 	RTE_LOG(INFO, PMD, "Flushing rx queues\n");
+ 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+ 		struct neta_rxq *rxq = dev->data->rx_queues[i];
+ 		struct neta_ppio_desc descs[MRVL_NETA_RXD_MAX];
+ 
+ 		mrvlna_flush_rx_queue(rxq, descs);
+-		mrvlna_free_buffs(priv, descs);
+ 		mrvlna_rx_queue_release(rxq);
+ 	}
+ 
++	RTE_LOG(INFO, PMD, "Flushing tx queues\n");
++	for (i = 0; i < dev->data->nb_tx_queues; i++) {
++		struct neta_txq *txq = dev->data->tx_queues[i];
++
++		mrvlna_tx_queue_flush(txq);
++		mrvlna_tx_queue_release(txq);
++	}
++
+ 	neta_ppio_deinit(priv->ppio);
+ 
+ 	priv = NULL;
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 6d166ed..e4e09d1 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -77,11 +77,11 @@
+ /** Maximum number of descriptors in shadow queue. Must be power of 2 */
+ #define MRVL_NETA_TX_SHADOWQ_SIZE MRVL_NETA_TXD_MAX
+ 
+-///** Shadow queue size mask (since shadow queue size is power of 2) */
+-//#define MRVL_NETA_TX_SHADOWQ_MASK (MRVL_NETA_TX_SHADOWQ_SIZE - 1)
+-//
+-///** Minimum number of sent buffers to release from shadow queue to BM */
+-//#define MRVL_NETA_BUF_RELEASE_BURST_SIZE	64
++/** Shadow queue size mask (since shadow queue size is power of 2) */
++#define MRVL_NETA_TX_SHADOWQ_MASK (MRVL_NETA_TX_SHADOWQ_SIZE - 1)
++
++/** Minimum number of sent buffers to release from shadow queue to BM */
++#define MRVL_NETA_BUF_RELEASE_BURST_SIZE	64
+ 
+ struct neta_priv {
+ 	/* Hot fields, used in fast path. */
+-- 
+2.7.4
+

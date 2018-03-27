@@ -1,0 +1,80 @@
+From 8fc583bbb6344a3a90fc310839a809181ef4ba7a Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Fri, 9 Mar 2018 14:24:34 +0100
+Subject: [PATCH 44/74] mrvlna: fix buffer allocation & refill procedure
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 15 +++++++++++----
+ drivers/net/mrvlna/mrvlna_ethdev.h |  2 ++
+ 2 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index d3bfe05..8ab0a86 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -111,6 +111,7 @@ struct neta_rxq {
+ 	int cksum_enabled;
+ 	uint64_t bytes_recv;
+ 	uint64_t drop_mac;
++	uint64_t pkts_processed;
+ 	/* Virtual address of the RX DMA descriptors array */
+ 	struct neta_ppio_desc *descs;
+ };
+@@ -140,14 +141,14 @@ static int mrvlna_lcore_last;
+  *   0 on success, negative error value otherwise.
+  */
+ static int
+-mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq)
++mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq, int num)
+ {
+ 	struct rte_mbuf *mbufs[MRVL_NETA_TXD_MAX];
+ 	struct neta_buff_inf entries[MRVL_NETA_TXD_MAX];
+ 	uint16_t nb_desc;
+ 	int ret, i;
+ 
+-	nb_desc = rxq->size;
++	nb_desc = num;
+ 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, nb_desc);
+ 	if (ret)
+ 		RTE_LOG(ERR, PMD,
+@@ -584,8 +585,14 @@ mrvlna_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+ 		rx_pkts[rx_done++] = mbuf;
+ 		q->bytes_recv += mbuf->pkt_len;
+ 	}
++	q->pkts_processed += rx_done;
+ 
+-	/* TODO refill or free mbufs according to needs */
++	if (q->pkts_processed > MVRL_NETA_RX_FREE_THRESH) {
++		ret = mrvlna_buffs_alloc(q->priv, q, MVRL_NETA_RX_FREE_THRESH);
++		if (ret)
++			RTE_LOG(ERR, PMD, "Refill failed\n");
++		q->pkts_processed -= MVRL_NETA_RX_FREE_THRESH;
++	}
+ 
+ 	return rx_done;
+ }
+@@ -965,7 +972,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	/* Allocate buffers */
+ 	for (i=0; i < dev->data->nb_rx_queues; i++) {
+ 		struct neta_rxq *rxq = dev->data->rx_queues[i];
+-		ret = mrvlna_buffs_alloc(priv, rxq);
++		ret = mrvlna_buffs_alloc(priv, rxq, rxq->size);
+ 		if (ret) {
+ 			rte_free(rxq);
+ 			return ret;
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index e2a403a..d454fec 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -80,6 +80,8 @@
+ /** Minimum number of sent buffers to release from shadow queue to BM */
+ #define MRVL_NETA_BUF_RELEASE_BURST_SIZE	64
+ 
++#define MVRL_NETA_RX_FREE_THRESH (MRVL_NETA_BUF_RELEASE_BURST_SIZE * 2)
++
+ struct neta_priv {
+ 	/* Hot fields, used in fast path. */
+ 	struct neta_ppio	*ppio;    /**< Port handler pointer */
+-- 
+2.7.4
+

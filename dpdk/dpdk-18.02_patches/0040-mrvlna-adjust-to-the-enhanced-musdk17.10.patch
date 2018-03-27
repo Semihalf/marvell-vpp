@@ -1,0 +1,66 @@
+From 1506719115e60b71fd76183b70d49858ab5ca510 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 7 Mar 2018 09:39:31 +0100
+Subject: [PATCH 40/74] mrvlna: adjust to the enhanced musdk17.10
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 8 +-------
+ drivers/net/mrvlna/mrvlna_ethdev.h | 2 --
+ 2 files changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 3dc77fb..5ed40b5 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -190,7 +190,7 @@ mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+ }
+ 
+ /**
+- * Release already sent buffers to bpool (buffer-pool).
++ * Release already sent buffers to mempool.
+  *
+  * @param ppio
+  *   Pointer to the port structure.
+@@ -627,10 +627,6 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 	priv->ppio_params.inqs_params.num_tcs = 1;
+ 	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_NETA_PKT_OFFS;
+ 
+-	/* Disable hardware buffer management */
+-	priv->ppio_params.inqs_params.hw_bm_en = 0;
+-
+-
+ 	return 0;
+ }
+ 
+@@ -841,8 +837,6 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	snprintf(match, sizeof(match), "neta-%d", priv->ppio_id);
+ 	priv->ppio_params.match = match;
+ 
+-	snprintf(priv->ppio_params.if_name, sizeof(priv->ppio_params.if_name), "%s", dev->data->name);
+-
+ 	ret = neta_ppio_init(&priv->ppio_params, &priv->ppio);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init ppio\n");
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index bc2d3d3..e2a403a 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -46,7 +46,6 @@
+ #endif
+ 
+ #include <drivers/mv_neta.h>
+-#include <drivers/mv_neta_bpool.h>
+ #include <drivers/mv_neta_ppio.h>
+ 
+ /** Packet offset inside RX buffer. */
+@@ -84,7 +83,6 @@
+ struct neta_priv {
+ 	/* Hot fields, used in fast path. */
+ 	struct neta_ppio	*ppio;    /**< Port handler pointer */
+-	uint8_t bpool_en;
+ 
+ 	uint8_t pp_id;
+ 	uint8_t ppio_id;	/* ppio port id */
+-- 
+2.7.4
+

@@ -1,0 +1,142 @@
+From e9d0ddb33e2e38dd168434523b539f3b3104d47f Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 26 Feb 2018 19:45:28 +0100
+Subject: [PATCH 20/74] mrvlna: add mbufs allocation
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 51 ++++++++++++++++++++++++++++++++++----
+ 1 file changed, 46 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index ce8849c..bbaad43 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -104,6 +104,10 @@ struct neta_rxq {
+ 	int cksum_enabled;
+ 	uint64_t bytes_recv;
+ 	uint64_t drop_mac;
++	/* Virtual address of the RX DMA descriptors array */
++	struct neta_ppio_desc *descs;
++	/* DMA address of the RX DMA descriptors array */
++	dma_addr_t descs_phys;
+ };
+ 
+ struct neta_txq {
+@@ -119,6 +123,33 @@ static int mrvlna_dev_num;
+ static int mrvlna_lcore_first;
+ static int mrvlna_lcore_last;
+ 
++
++static int
++mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct rte_mbuf **mbufs, uint16_t desc)
++{
++	struct neta_buff_inf entries[MRVL_NETA_TXD_MAX];
++	int ret, i;
++
++	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, desc);
++	if (ret)
++		RTE_LOG(ERR, PMD,
++				"Failed to allocate %u mbufs.\n", desc);
++
++	for (i = 0; i <= desc; i++) {
++		entries[i].addr = rte_mbuf_data_iova_default(mbufs[i]);
++		entries[i].cookie = (neta_cookie_t)(uint64_t)mbufs[i];
++	}
++	ret = neta_ppio_inq_put_buffs(priv->ppio, rxq->queue_id, entries, &desc);
++	if (ret) {
++		RTE_LOG(ERR, PMD,
++				"Failed to fill rx desc\n");
++		rte_free(rxq);
++		return ret;
++	}
++
++	return 0;
++}
++
+ /**
+  * Deinitialize packet processor.
+  */
+@@ -346,8 +377,10 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+ 	struct neta_rxq *rxq;
++	struct rte_mbuf *mbufs[MRVL_NETA_TXD_MAX];
+ 	uint32_t min_size,
+ 		 max_rx_pkt_len = dev->data->dev_conf.rxmode.max_rx_pkt_len;
++	int ret;
+ 
+ 	min_size = rte_pktmbuf_data_room_size(mp) - RTE_PKTMBUF_HEADROOM -
+ 		   MRVLNA_PKT_EFFEC_OFFS;
+@@ -382,11 +415,11 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
+ 		desc;
+ 
+-	//TODO alloc mbufs
+-	// here
+-
+-
+-//	priv->bpool_init_size += desc;
++	ret = mrvlna_alloc_buffs(priv, rxq, mbufs, desc);
++	if (ret) {
++		rte_free(rxq);
++		return ret;
++	}
+ 
+ 	dev->data->rx_queues[idx] = rxq;
+ 
+@@ -415,6 +448,8 @@ mrvlna_rx_queue_release(void *rxq)
+ 	for (i = 0; i < num; i++) {
+ 		//TODO free alloc mbufs
+ 		//here
++	//	rte_pktmbuf_free((struct rte_mbuf *)q->descs);
++		//mbuf in rx need to be relas in case of dev_stop or dev_open failure !! TODO
+ 
+ 	}
+ 
+@@ -597,10 +632,12 @@ mrvlna_priv_create(const char *dev_name)
+ 	if (!priv)
+ 		return NULL;
+ 
++	RTE_LOG(INFO, PMD, "Creating priv \n");
+ 	ret = neta_netdev_get_port_info((char *)(uintptr_t)dev_name,
+ 			&priv->ppio_id);
+ 	if (ret)
+ 		goto out_free_priv;
++	RTE_LOG(INFO, PMD, "Creating out priv\n");
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+ 
+@@ -635,12 +672,14 @@ mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
+ 	if (!eth_dev)
+ 		return -ENOMEM;
+ 
++	RTE_LOG(INFO, PMD, "Creating \n");
+ 	priv = mrvlna_priv_create(name);
+ 	if (!priv) {
+ 		ret = -ENOMEM;
+ 		goto out_free_dev;
+ 	}
+ 
++	RTE_LOG(INFO, PMD, "Creating \n");
+ 	eth_dev->data->mac_addrs =
+ 		rte_zmalloc("mac_addrs",
+ 			    ETHER_ADDR_LEN * MRVLNA_MAC_ADDRS_MAX, 0);
+@@ -649,6 +688,7 @@ mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
+ 		ret = -ENOMEM;
+ 		goto out_free_priv;
+ 	}
++	RTE_LOG(INFO, PMD, "Creating \n");
+ 
+ 	memset(&req, 0, sizeof(req));
+ 	strcpy(req.ifr_name, name);
+@@ -755,6 +795,7 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 	}
+ 
+ 	ret = mrvlna_init_neta();
++	RTE_LOG(INFO, PMD, "Creating ret %d\n", ret);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init NETA!\n");
+ 		goto out_deinit_dma;
+-- 
+2.7.4
+

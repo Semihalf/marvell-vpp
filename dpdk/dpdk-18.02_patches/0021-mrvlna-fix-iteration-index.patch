@@ -1,0 +1,25 @@
+From 5aeb26f793c5a57d50621b49eb37261c6267a3ce Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 14:00:40 +0100
+Subject: [PATCH 21/74] mrvlna: fix iteration index
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index bbaad43..62bd6ff 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -135,7 +135,7 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct rte_mbuf
+ 		RTE_LOG(ERR, PMD,
+ 				"Failed to allocate %u mbufs.\n", desc);
+ 
+-	for (i = 0; i <= desc; i++) {
++	for (i = 0; i < desc; i++) {
+ 		entries[i].addr = rte_mbuf_data_iova_default(mbufs[i]);
+ 		entries[i].cookie = (neta_cookie_t)(uint64_t)mbufs[i];
+ 	}
+-- 
+2.7.4
+

@@ -1,0 +1,137 @@
+From 5ced0944b3f988fa95ba1fb131dc3a79fd8335d3 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 15:16:38 +0100
+Subject: [PATCH 25/74] mrvlna: add link_update callback
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 80 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 75 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index fd80c7c..8ce3276 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -592,6 +592,80 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 	priv = NULL;
+ }
+ 
++/**
++ * DPDK callback to retrieve physical link information.
++ *
++ * @param dev
++ *   Pointer to Ethernet device structure.
++ * @param wait_to_complete
++ *   Wait for request completion (ignored).
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
++{
++	/*
++	 * TODO
++	 * once MUSDK provides necessary API use it here
++	 */
++	struct neta_priv *priv = dev->data->dev_private;
++	struct ethtool_cmd edata;
++	struct ifreq req;
++	int ret, fd, link_up;
++
++	if (!priv->ppio)
++		return -EPERM;
++
++	edata.cmd = ETHTOOL_GSET;
++
++	strcpy(req.ifr_name, dev->data->name);
++	req.ifr_data = (void *)&edata;
++
++	fd = socket(AF_INET, SOCK_DGRAM, 0);
++	if (fd == -1)
++		return -EFAULT;
++	ret = ioctl(fd, SIOCETHTOOL, &req);
++	if (ret == -1) {
++		close(fd);
++		return -EFAULT;
++	}
++
++	close(fd);
++
++	switch (ethtool_cmd_speed(&edata)) {
++	case SPEED_10:
++		dev->data->dev_link.link_speed = ETH_SPEED_NUM_10M;
++		break;
++	case SPEED_100:
++		dev->data->dev_link.link_speed = ETH_SPEED_NUM_100M;
++		break;
++	case SPEED_1000:
++		dev->data->dev_link.link_speed = ETH_SPEED_NUM_1G;
++		break;
++	case SPEED_10000:
++		dev->data->dev_link.link_speed = ETH_SPEED_NUM_10G;
++		break;
++	default:
++		dev->data->dev_link.link_speed = ETH_SPEED_NUM_NONE;
++	}
++
++	dev->data->dev_link.link_duplex = edata.duplex ? ETH_LINK_FULL_DUPLEX :
++							 ETH_LINK_HALF_DUPLEX;
++	dev->data->dev_link.link_autoneg = edata.autoneg ? ETH_LINK_AUTONEG :
++							   ETH_LINK_FIXED;
++	/*
++	 * TODO this function is not implemented in MUSDK
++	 * find other way to check link status
++	 */
++	/*neta_ppio_get_link_state(priv->ppio, &link_up);*/
++	link_up = 1;
++	dev->data->dev_link.link_status = link_up ? ETH_LINK_UP : ETH_LINK_DOWN;
++
++	return 0;
++}
++
+ static const struct eth_dev_ops mrvlna_ops = {
+ 	.dev_configure = mrvlna_dev_configure,
+ 	.dev_start = mrvlna_dev_start,
+@@ -599,7 +673,7 @@ static const struct eth_dev_ops mrvlna_ops = {
+ //	.dev_set_link_up = ,
+ //	.dev_set_link_down = ,
+ //	.dev_close = ,
+-//	.link_update = ,
++	.link_update = mrvlna_link_update,
+ //	.mac_addr_remove = ,
+ //	.mac_addr_add = ,
+ //	.mac_addr_set = ,
+@@ -678,14 +752,12 @@ mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
+ 	if (!eth_dev)
+ 		return -ENOMEM;
+ 
+-	RTE_LOG(INFO, PMD, "Creating \n");
+ 	priv = mrvlna_priv_create(name);
+ 	if (!priv) {
+ 		ret = -ENOMEM;
+ 		goto out_free_dev;
+ 	}
+ 
+-	RTE_LOG(INFO, PMD, "Creating \n");
+ 	eth_dev->data->mac_addrs =
+ 		rte_zmalloc("mac_addrs",
+ 			    ETHER_ADDR_LEN * MRVLNA_MAC_ADDRS_MAX, 0);
+@@ -694,7 +766,6 @@ mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
+ 		ret = -ENOMEM;
+ 		goto out_free_priv;
+ 	}
+-	RTE_LOG(INFO, PMD, "Creating \n");
+ 
+ 	memset(&req, 0, sizeof(req));
+ 	strcpy(req.ifr_name, name);
+@@ -801,7 +872,6 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 	}
+ 
+ 	ret = mrvlna_init_neta();
+-	RTE_LOG(INFO, PMD, "Creating ret %d\n", ret);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init NETA!\n");
+ 		goto out_deinit_dma;
+-- 
+2.7.4
+

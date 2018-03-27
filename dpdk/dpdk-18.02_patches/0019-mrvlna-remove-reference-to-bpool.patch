@@ -1,0 +1,146 @@
+From 02cf6326b0d93c0f9b29900a6d8884eea489434f Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 26 Feb 2018 13:14:53 +0100
+Subject: [PATCH 19/74] mrvlna: remove reference to bpool
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 47 ++++++++++++--------------------------
+ drivers/net/mrvlna/mrvlna_ethdev.h |  7 +-----
+ 2 files changed, 16 insertions(+), 38 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 36a3d92..ce8849c 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -118,7 +118,6 @@ struct neta_txq {
+ static int mrvlna_dev_num;
+ static int mrvlna_lcore_first;
+ static int mrvlna_lcore_last;
+-int mrvl_port_bpool_size[NETA_BPOOL_NUM_POOLS][RTE_MAX_LCORE];
+ 
+ /**
+  * Deinitialize packet processor.
+@@ -269,6 +268,9 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 	priv->ppio_params.inqs_params.num_tcs = 1;
+ 	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_PKT_OFFS;
+ 
++	/* Disable hardware buffer management */
++	priv->ppio_params.inqs_params.hw_bm_en = 0;
++
+ 
+ 	return 0;
+ }
+@@ -373,8 +375,8 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	rxq->queue_id = idx;
+ 	rxq->port_id = dev->data->port_id;
+ 
+-	//TODO bpool management
+-//	mrvl_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
++//	if (priv->bpool_en == 1)
++//		;//mrvlna_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
+ 
+ 
+ 	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
+@@ -384,7 +386,7 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	// here
+ 
+ 
+-	priv->bpool_init_size += desc;
++//	priv->bpool_init_size += desc;
+ 
+ 	dev->data->rx_queues[idx] = rxq;
+ 
+@@ -587,46 +589,29 @@ static const struct eth_dev_ops mrvlna_ops = {
+ static struct neta_priv *
+ mrvlna_priv_create(const char *dev_name)
+ {
+-	struct neta_bpool_params bpool_params;
+ 	char match[MRVLNA_MATCH_LEN];
+ 	struct neta_priv *priv;
+-//	int ret;// bpool_bit;
++	int ret;
+ 
+ 	priv = rte_zmalloc_socket(dev_name, sizeof(*priv), 0, rte_socket_id());
+ 	if (!priv)
+ 		return NULL;
+ 
+-//	ret = pp2_netdev_get_ppio_info((char *)(uintptr_t)dev_name,
+-//				       &priv->pp_id, &priv->ppio_id);
+-//	if (ret)
+-//		goto out_free_priv;
+-
+-//	bpool_bit = mrvl_reserve_bit(&used_bpools[priv->pp_id],
+-//				     PP2_BPOOL_NUM_POOLS);
+-//	if (bpool_bit < 0)
+-//		goto out_free_priv;
+-//	priv->bpool_bit = bpool_bit;
++	ret = neta_netdev_get_port_info((char *)(uintptr_t)dev_name,
++			&priv->ppio_id);
++	if (ret)
++		goto out_free_priv;
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+-	memset(&bpool_params, 0, sizeof(bpool_params));
+-	bpool_params.match = match;
+-	bpool_params.buff_len = MRVLNA_PKT_SIZE_MAX + MRVLNA_PKT_EFFEC_OFFS;
+-//	ret = neta_bpool_init(&bpool_params, &priv->bpool);
+-//	if (ret) {
+-//		RTE_LOG(ERR, PMD, "Failed to init bpool!\n");
+-//	//	goto out_clear_bpool_bit;
+-//		goto out_free_priv;
+-//	}
+ 
+ //	priv->ppio_params.type = PP2_PPIO_T_NIC;
+ //	rte_spinlock_init(&priv->lock);
+ 
+ 	return priv;
+-//out_clear_bpool_bit:
+-//	used_bpools[priv->pp_id] &= ~(1 << priv->bpool_bit);
+-//out_free_priv:
+-//	rte_free(priv);
+-//	return NULL;
++
++out_free_priv:
++	rte_free(priv);
++	return NULL;
+ }
+ 
+ /**
+@@ -775,8 +760,6 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 		goto out_deinit_dma;
+ 	}
+ 
+-	memset(mrvl_port_bpool_size, 0, sizeof(mrvl_port_bpool_size));
+-
+ 	mrvlna_lcore_first = RTE_MAX_LCORE;
+ 	mrvlna_lcore_last = 0;
+ 
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 6d4ebbd..68903c7 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -83,12 +83,8 @@
+ 
+ struct neta_priv {
+ 	/* Hot fields, used in fast path. */
+-	struct neta_bpool *bpool;  /**< BPool pointer */
+ 	struct neta_ppio	*ppio;    /**< Port handler pointer */
+-//	rte_spinlock_t lock;	  /**< Spinlock for checking bpool status */
+-	uint16_t bpool_max_size;  /**< BPool maximum size */
+-	uint16_t bpool_min_size;  /**< BPool minimum size  */
+-	uint16_t bpool_init_size; /**< Configured BPool size  */
++	uint8_t bpool_en;
+ 
+ 	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
+ //	struct {
+@@ -99,7 +95,6 @@ struct neta_priv {
+ 	/* Configuration data, used sporadically. */
+ 	uint8_t pp_id;
+ 	uint8_t ppio_id;
+-	uint8_t bpool_bit;
+ //	uint8_t uc_mc_flushed;
+ //	uint8_t vlan_flushed;
+ //	uint8_t isolated;
+-- 
+2.7.4
+

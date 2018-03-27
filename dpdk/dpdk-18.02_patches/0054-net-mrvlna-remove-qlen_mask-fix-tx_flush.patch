@@ -1,0 +1,93 @@
+From 35371ad651d8716802b5e026934644bc709845de Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 15 Mar 2018 14:44:30 +0100
+Subject: [PATCH 54/74] net/mrvlna: remove qlen_mask; fix tx_flush
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 175e387..f0f93c8 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -126,7 +126,6 @@ struct neta_txq {
+ 	uint64_t bytes_sent;
+ 	struct neta_shadow_txq shadow_txqs[RTE_MAX_LCORE];
+ 	int tx_deferred_start;
+-	uint32_t qlen_mask;
+ };
+ 
+ static int mrvlna_dev_num;
+@@ -226,15 +225,12 @@ mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+  *   Pointer to the shadow queue.
+  * @param qid
+  *   Queue id number.
+- * @param qlen_mask
+- *   Queue size mask
+  * @param force
+  *   Force releasing packets.
+  */
+ static inline void
+ mrvlna_sent_buffers_free(struct neta_ppio *ppio,
+-		struct neta_shadow_txq *sq, int qid,
+-		uint32_t qlen_mask, int force)
++		struct neta_shadow_txq *sq, int qid, int force)
+ {
+ 	struct neta_buff_inf *entry;
+ 	uint16_t nb_done = 0;
+@@ -260,7 +256,7 @@ mrvlna_sent_buffers_free(struct neta_ppio *ppio,
+ 				"Shadow memory @%d: cookie(%lx), pa(%lx)!\n",
+ 				sq->tail, (u64)entry->cookie,
+ 				(u64)entry->addr);
+-			tail = (tail + 1) & qlen_mask;;
++			tail = (tail + 1) & MRVL_NETA_TX_SHADOWQ_MASK;;
+ 			continue;
+ 		}
+ 
+@@ -269,7 +265,7 @@ mrvlna_sent_buffers_free(struct neta_ppio *ppio,
+ 		mbuf = (struct rte_mbuf *)
+ 			   (cookie_addr_high | entry->cookie);
+ 		rte_pktmbuf_free(mbuf);
+-		tail = (tail + 1) & qlen_mask;
++		tail = (tail + 1) & MRVL_NETA_TX_SHADOWQ_MASK;
+ 	}
+ 
+ 	sq->tail = tail;
+@@ -308,7 +304,6 @@ static void
+ mrvlna_tx_queue_flush(struct neta_txq *txq)
+ {
+ 	int i;
+-	uint32_t qlen_mask = txq->qlen_mask;
+ 
+ 	for (i = 0; i < RTE_MAX_LCORE; i++) {
+ 		struct neta_shadow_txq *sq =
+@@ -320,7 +315,7 @@ mrvlna_tx_queue_flush(struct neta_txq *txq)
+ 				sq->ent[sq->tail].cookie;
+ 			rte_pktmbuf_free(
+ 				(struct rte_mbuf *)addr);
+-			sq->tail = (sq->tail + 1) & qlen_mask;
++			sq->tail = (sq->tail + 1) & MRVL_NETA_TX_SHADOWQ_MASK;
+ 		}
+ 		memset(sq, 0, sizeof(*sq));
+ 	}
+@@ -459,7 +454,7 @@ mrvlna_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ 
+ 	if (sq->size)
+ 		mrvlna_sent_buffers_free(q->priv->ppio,
+-				sq, q->queue_id, q->qlen_mask, 0);
++				sq, q->queue_id, 0);
+ 
+ 	sq_free_size = MRVL_NETA_TX_SHADOWQ_SIZE - sq->size - 1;
+ 	if (unlikely(nb_pkts > sq_free_size)) {
+@@ -915,7 +910,6 @@ mrvlna_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	txq->queue_id = idx;
+ 	txq->port_id = dev->data->port_id;
+ 	txq->tx_deferred_start = conf->tx_deferred_start;
+-	txq->qlen_mask = desc - 1;
+ 	dev->data->tx_queues[idx] = txq;
+ 
+ 	priv->ppio_params.outqs_params.outqs_params[idx].size = desc;
+-- 
+2.7.4
+

@@ -1,0 +1,159 @@
+From 21d4f5eeb2e1049e3ab3bf74db59c416545bdcee Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 1 Mar 2018 16:10:29 +0100
+Subject: [PATCH 33/74] mrvlna: change function names to follow convention
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 31 +++++++++++++++----------------
+ 1 file changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 7716131..318cf2a 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -75,7 +75,6 @@ static const char * const valid_args[] = {
+ };
+ 
+ struct mrvlna_ifnames {
+-//	const char *names[PP2_NUM_ETH_PPIO * PP2_NUM_PKT_PROC]; //PP2_NUM_PKT_PROC = 2 (u nas 1 PP prawdopodobnie, PP2_NUM_ETH_PPIO = 3 (3 instancje, u nas 4)
+ 	const char *names[NETA_NUM_ETH_PPIO];
+ 	int idx;
+ };
+@@ -138,7 +137,7 @@ static int mrvlna_lcore_last;
+  *   0 on success, negative error value otherwise.
+  */
+ static int
+-mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
++mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq)
+ {
+ 	struct rte_mbuf *mbufs[MRVL_NETA_TXD_MAX];
+ 	struct neta_buff_inf entries[MRVL_NETA_TXD_MAX];
+@@ -169,7 +168,7 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+  * Return mbufs to mempool.
+  */
+ static void
+-mrvlna_free_buffs(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
++mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+ {
+ 	uint64_t addr;
+ 	uint8_t i;
+@@ -200,7 +199,7 @@ mrvlna_free_buffs(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+  *   Force releasing packets.
+  */
+ static inline void
+-mrvlna_free_sent_buffers(struct neta_ppio *ppio,
++mrvlna_sent_buffers_free(struct neta_ppio *ppio,
+ 		struct neta_shadow_txq *sq, int qid,
+ 		uint32_t qlen_mask, int force)
+ {
+@@ -253,7 +252,7 @@ mrvlna_free_sent_buffers(struct neta_ppio *ppio,
+  *   Array of rx descriptors
+  */
+ static void
+-mrvlna_flush_rx_queue(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
++mrvlna_rx_queue_flush(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ {
+ 	int ret, num;
+ 
+@@ -264,7 +263,7 @@ mrvlna_flush_rx_queue(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ 					descs, (uint16_t *)&num);
+ 	} while (ret == 0 && num);
+ 
+-	mrvlna_free_buffs(rxq, descs);
++	mrvlna_recv_buffs_free(rxq, descs);
+ }
+ 
+ /**
+@@ -283,7 +282,7 @@ mrvlna_tx_queue_flush(struct neta_txq *txq)
+ 		struct neta_shadow_txq *sq;
+ 
+ 		sq = &txq->shadow_txqs[i];
+-		mrvlna_free_sent_buffers(txq->priv->ppio,
++		mrvlna_sent_buffers_free(txq->priv->ppio,
+ 				sq, txq->queue_id, qlen_mask, 1);
+ 
+ 		/* free the rest of them */
+@@ -302,7 +301,7 @@ mrvlna_tx_queue_flush(struct neta_txq *txq)
+  * Deinitialize packet processor.
+  */
+ static void
+-mrvlna_deinit_neta(void)
++mrvlna_neta_deinit(void)
+ {
+ 	neta_deinit();
+ }
+@@ -314,7 +313,7 @@ mrvlna_deinit_neta(void)
+  *   0 on success, negative error value otherwise.
+  */
+ static int
+-mrvlna_init_neta(void)
++mrvlna_neta_init(void)
+ {
+ 	struct neta_init_params init_params;
+ 
+@@ -338,7 +337,7 @@ mrvlna_init_neta(void)
+  *   Always 0.
+  */
+ static int
+-mrvlna_get_ifnames(const char *key __rte_unused, const char *value,
++mrvlna_ifnames_get(const char *key __rte_unused, const char *value,
+ 		 void *extra_args)
+ {
+ 	struct mrvlna_ifnames *ifnames = extra_args;
+@@ -673,7 +672,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	/* Allocate buffers */
+ 	for (i=0; i < dev->data->nb_rx_queues; i++) {
+ 		struct neta_rxq *rxq = dev->data->rx_queues[i];
+-		ret = mrvlna_alloc_buffs(priv, rxq);
++		ret = mrvlna_buffs_alloc(priv, rxq);
+ 		if (ret) {
+ 			rte_free(rxq);
+ 			return ret;
+@@ -725,7 +724,7 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 		struct neta_rxq *rxq = dev->data->rx_queues[i];
+ 		struct neta_ppio_desc descs[MRVL_NETA_RXD_MAX];
+ 
+-		mrvlna_flush_rx_queue(rxq, descs);
++		mrvlna_rx_queue_flush(rxq, descs);
+ 		mrvlna_rx_queue_release(rxq);
+ 	}
+ 
+@@ -994,7 +993,7 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 
+ 	ifnames.idx = 0;
+ 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
+-			   mrvlna_get_ifnames, &ifnames);
++			   mrvlna_ifnames_get, &ifnames);
+ 
+ 	/*
+ 	 * The below system initialization should be done only once,
+@@ -1017,7 +1016,7 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 					"DMA memory has been already initialized by a different driver.\n");
+ 	}
+ 
+-	ret = mrvlna_init_neta();
++	ret = mrvlna_neta_init();
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init NETA!\n");
+ 		goto out_deinit_dma;
+@@ -1043,7 +1042,7 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 		mrvlna_eth_dev_destroy(ifnames.names[i]);
+ 
+ 	if (mrvlna_dev_num == 0)
+-		mrvlna_deinit_neta();
++		mrvlna_neta_deinit();
+ out_deinit_dma:
+ 	if (mrvlna_dev_num == 0)
+ 		mv_sys_dma_mem_destroy();
+@@ -1084,7 +1083,7 @@ rte_pmd_mrvlna_remove(struct rte_vdev_device *vdev)
+ 
+ 	if (mrvlna_dev_num == 0) {
+ 		RTE_LOG(INFO, PMD, "Perform MUSDK deinit\n");
+-		mrvlna_deinit_neta();
++		mrvlna_neta_deinit();
+ 		mv_sys_dma_mem_destroy();
+ 	}
+ 
+-- 
+2.7.4
+

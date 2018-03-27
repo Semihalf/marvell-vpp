@@ -1,0 +1,156 @@
+From 0b0bb76bb826129a2411c37d3eeacb6ea76fed70 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 7 Mar 2018 22:20:23 +0100
+Subject: [PATCH 41/74] mrvlna: add link up and mtu set callbacks
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 92 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 86 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 5ed40b5..54aacf0 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -675,6 +675,78 @@ mrvlna_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
+ }
+ 
+ /**
++ * DPDK callback to change the MTU.
++ *
++ * Setting the MTU affects hardware MRU (packets larger than the MRU
++ * will be dropped).
++ *
++ * @param dev
++ *   Pointer to Ethernet device structure.
++ * @param mtu
++ *   New MTU.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
++{
++	struct neta_priv *priv = dev->data->dev_private;
++	/* extra MV_MH_SIZE bytes are required for Marvell tag */
++	uint16_t mru = mtu + MV_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
++	int ret;
++
++	if (mtu < ETHER_MIN_MTU || mru > MRVLNA_PKT_SIZE_MAX)
++		return -EINVAL;
++
++	if (!priv->ppio)
++		return 0;
++
++	RTE_LOG(INFO, PMD, "mtu %u mru %u\n ", mtu, mru);
++	ret = neta_ppio_set_mru(priv->ppio, mru);
++	if (ret)
++		return ret;
++
++	return neta_ppio_set_mtu(priv->ppio, mtu);
++}
++
++/**
++ * DPDK callback to bring the link up.
++ *
++ * @param dev
++ *   Pointer to Ethernet device structure.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_dev_set_link_up(struct rte_eth_dev *dev)
++{
++	struct neta_priv *priv = dev->data->dev_private;
++	int ret;
++
++	if (!priv->ppio)
++		return -EPERM;
++
++	ret = neta_ppio_enable(priv->ppio);
++	if (ret)
++		return ret;
++
++	/*
++	 * mtu/mru can be updated if pp2_ppio_enable() was called at least once
++	 * as pp2_ppio_enable() changes port->t_mode from default 0 to
++	 * PP2_TRAFFIC_INGRESS_EGRESS.
++	 *
++	 * Set mtu to default DPDK value here.
++	 */
++	ret = mrvlna_mtu_set(dev, dev->data->mtu);
++	if (ret)
++		neta_ppio_disable(priv->ppio);
++
++	return ret;
++}
++
++/**
+  * DPDK callback to configure the receive queue.
+  *
+  * @param dev
+@@ -796,6 +868,7 @@ mrvlna_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	dev->data->tx_queues[idx] = txq;
+ 
+ 	priv->ppio_params.outqs_params.outqs_params[idx].size = desc;
++	priv->ppio_params.outqs_params.outqs_params[idx].weight = 1;
+ 
+ 	return 0;
+ }
+@@ -836,6 +909,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	priv->ppio_id = dev->data->port_id;
+ 	snprintf(match, sizeof(match), "neta-%d", priv->ppio_id);
+ 	priv->ppio_params.match = match;
++	priv->ppio_params.inqs_params.mtu = 1500;
+ 
+ 	ret = neta_ppio_init(&priv->ppio_params, &priv->ppio);
+ 	if (ret) {
+@@ -853,6 +927,12 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 		}
+ 	}
+ 
++	ret = mrvlna_dev_set_link_up(dev);
++	if (ret) {
++		RTE_LOG(ERR, PMD, "Failed to set link up\n");
++		goto out;
++	}
++
+ /* start tx queues */
+ 	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+ 		struct neta_txq *txq = dev->data->tx_queues[i];
+@@ -873,10 +953,10 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 
+ 	return 0;
+ 
+-//out:
+-//	RTE_LOG(ERR, PMD, "Failed to start device\n");
+-//	neta_ppio_deinit(priv->ppio);
+-//	return ret;
++out:
++	RTE_LOG(ERR, PMD, "Failed to start device\n");
++	neta_ppio_deinit(priv->ppio);
++	return ret;
+ }
+ 
+ 
+@@ -999,14 +1079,14 @@ static const struct eth_dev_ops mrvlna_ops = {
+ 	.dev_configure = mrvlna_dev_configure,
+ 	.dev_start = mrvlna_dev_start,
+ 	.dev_stop = mrvlna_dev_stop,
+-//	.dev_set_link_up = ,
++	.dev_set_link_up = mrvlna_dev_set_link_up,
+ //	.dev_set_link_down = ,
+ //	.dev_close = ,
+ 	.link_update = mrvlna_link_update,
+ //	.mac_addr_remove = ,
+ //	.mac_addr_add = ,
+ //	.mac_addr_set = ,
+-//	.mtu_set = ,
++	.mtu_set = mrvlna_mtu_set,
+ //	.stats_get = ,
+ //	.stats_reset = ,
+ 	.dev_infos_get = mrvlna_dev_infos_get,
+-- 
+2.7.4
+

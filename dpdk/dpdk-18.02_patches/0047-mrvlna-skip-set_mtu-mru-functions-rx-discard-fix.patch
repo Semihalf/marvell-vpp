@@ -1,0 +1,138 @@
+From 3a38a1b76b8f178519b7690e13721cc08da57a17 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 13 Mar 2018 11:49:52 +0100
+Subject: [PATCH 47/74] mrvlna: skip set_mtu/mru functions [rx discard fix]
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 48 ++++++++++++++++++--------------------
+ drivers/net/mrvlna/mrvlna_ethdev.h |  5 ++++
+ 2 files changed, 28 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 2aa3abe..264dd79 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -63,6 +63,7 @@
+ #define MRVLNA_MUSDK_DMA_MEMSIZE 41943040 /* (40 * 1024 * 1024) */
+ 
+ #define MRVLNA_PKT_SIZE_MAX (16382 - MV_MH_SIZE) /* 9700B */
++#define MRVLNA_DEFAULT_MTU	1500
+ 
+ #define MRVLNA_MAC_ADDRS_MAX 256 /*16 UC, 256 IP, 256 MC/BC */
+ /** Maximum length of a match string */
+@@ -609,6 +610,7 @@ static int
+ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
++	char match[MRVLNA_MATCH_LEN];
+ 
+ 	if (dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_NONE) {
+ 		RTE_LOG(INFO, PMD, "Unsupported RSS and rx multi queue mode %d\n",
+@@ -648,12 +650,13 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 
+ 	priv->ppio_params.outqs_params.num_outqs = dev->data->nb_tx_queues;
+ 	priv->nb_rx_queues = dev->data->nb_rx_queues;
+-
+-	/*
+-	 * Default: 1 TC, no QoS supported.
+-	 */
++	/* Default: 1 TC, no QoS supported. */
+ 	priv->ppio_params.inqs_params.num_tcs = 1;
+ 	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_NETA_PKT_OFFS;
++	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
++	priv->ppio_params.match = match;
++	/* TODO check if DPDK has already set mtu to default value */
++	priv->ppio_params.inqs_params.mtu = dev->data->mtu ? dev->data->mtu : MRVLNA_DEFAULT_MTU;
+ 
+ 	return 0;
+ }
+@@ -721,21 +724,26 @@ mrvlna_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+ 	/* extra MV_MH_SIZE bytes are required for Marvell tag */
+-	uint16_t mru = mtu + MV_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN;
+-	int ret;
++	uint16_t mru = MRVL_NETA_MTU_TO_MRU(mtu);
+ 
+-	if (mtu < ETHER_MIN_MTU || mru > MRVLNA_PKT_SIZE_MAX)
++	if (mtu < ETHER_MIN_MTU || mru > MRVLNA_PKT_SIZE_MAX) {
++		RTE_LOG(ERR, PMD, "Invalid MTU [%u] or MRU [%u]\n", mtu, mru);
+ 		return -EINVAL;
++	}
+ 
+ 	if (!priv->ppio)
+-		return 0;
++		return -EPERM;
++
++	/* TODO no this has no effect as mtu set only during initialization */
++	priv->ppio_params.inqs_params.mtu = mtu;
+ 
+-	RTE_LOG(INFO, PMD, "mtu %u mru %u\n ", mtu, mru);
+-	ret = neta_ppio_set_mru(priv->ppio, mru);
++	/* TODO below functions cause hardware undefined behaviour, skipped for now */
++	/*ret = neta_ppio_set_mru(priv->ppio, mru);
+ 	if (ret)
+ 		return ret;
+ 
+-	return neta_ppio_set_mtu(priv->ppio, mtu);
++	return neta_ppio_set_mtu(priv->ppio, mtu);*/
++	return 0;
+ }
+ 
+ /**
+@@ -760,18 +768,13 @@ mrvlna_dev_set_link_up(struct rte_eth_dev *dev)
+ 	if (ret)
+ 		return ret;
+ 
+-	/*
+-	 * mtu/mru can be updated if pp2_ppio_enable() was called at least once
+-	 * as pp2_ppio_enable() changes port->t_mode from default 0 to
+-	 * PP2_TRAFFIC_INGRESS_EGRESS.
+-	 *
+-	 * Set mtu to default DPDK value here.
+-	 */
+ 	ret = mrvlna_mtu_set(dev, dev->data->mtu);
+-	if (ret)
++	if (ret) {
+ 		neta_ppio_disable(priv->ppio);
++		return ret;
++	}
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ /**
+@@ -951,13 +954,8 @@ static int
+ mrvlna_dev_start(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+-	char match[MRVLNA_MATCH_LEN];
+ 	int ret = 0, i;
+ 
+-	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
+-	priv->ppio_params.match = match;
+-	priv->ppio_params.inqs_params.mtu = 1500;
+-
+ 	ret = neta_ppio_init(&priv->ppio_params, &priv->ppio);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init ppio\n");
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index d454fec..e629451 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -82,6 +82,11 @@
+ 
+ #define MVRL_NETA_RX_FREE_THRESH (MRVL_NETA_BUF_RELEASE_BURST_SIZE * 2)
+ 
++#define MRVL_NETA_MTU_TO_MRU(mtu) \
++	((mtu) + MV_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN)
++#define MRVL_NETA_MRU_TO_MTU(mru) \
++	((mru) - MV_MH_SIZE - ETHER_HDR_LEN + ETHER_CRC_LEN)
++
+ struct neta_priv {
+ 	/* Hot fields, used in fast path. */
+ 	struct neta_ppio	*ppio;    /**< Port handler pointer */
+-- 
+2.7.4
+
