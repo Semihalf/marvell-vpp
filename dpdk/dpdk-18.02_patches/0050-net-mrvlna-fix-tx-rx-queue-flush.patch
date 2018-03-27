@@ -1,0 +1,39 @@
+From 3317a153207db3163f383221f146b8beedd7debb Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 14 Mar 2018 10:11:24 +0100
+Subject: [PATCH 50/74] net/mrvlna: fix tx/rx queue flush
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 83d9dbc..a79a1ec 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -293,8 +293,6 @@ mrvlna_rx_queue_flush(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ 		ret = neta_ppio_recv(rxq->priv->ppio,
+ 					rxq->queue_id,
+ 					descs, (uint16_t *)&num);
+-		if (num)
+-			mrvlna_recv_buffs_free(rxq, descs);
+ 	} while (ret == 0 && num);
+ 
+ }
+@@ -312,11 +310,8 @@ mrvlna_tx_queue_flush(struct neta_txq *txq)
+ 	uint32_t qlen_mask = txq->qlen_mask;
+ 
+ 	for (i = 0; i < RTE_MAX_LCORE; i++) {
+-		struct neta_shadow_txq *sq;
+-
+-		sq = &txq->shadow_txqs[i];
+-		mrvlna_sent_buffers_free(txq->priv->ppio,
+-				sq, txq->queue_id, qlen_mask, 1);
++		struct neta_shadow_txq *sq =
++				&txq->shadow_txqs[i];
+ 
+ 		/* free the rest of them */
+ 		while (sq->tail != sq->head) {
+-- 
+2.7.4
+

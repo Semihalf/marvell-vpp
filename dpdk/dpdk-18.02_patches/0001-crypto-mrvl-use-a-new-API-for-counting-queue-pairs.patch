@@ -1,0 +1,41 @@
+From 87cd6a9c2701dfbc7aa0a9807dd35dea05ef1bc3 Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Tue, 27 Feb 2018 09:37:51 +0100
+Subject: [PATCH 01/74] crypto/mrvl: use a new API for counting queue pairs
+
+MUSDK 18.02 introduced a new API for counting queue pairs. Use
+it instead of relying on a predefined SAM_HW_RING_NUM constant.
+
+Signed-off-by: Tomasz Duszynski <tdu@semihalf.com>
+---
+ drivers/crypto/mrvl/rte_mrvl_pmd.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd.c b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+index 31f3fe5..2e71ac5 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+@@ -785,7 +785,7 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
+ {
+ 	struct rte_cryptodev_pmd_init_params init_params = { };
+ 	const char *name, *args;
+-	int ret;
++	int ret, i;
+ 
+ 	name = rte_vdev_device_name(vdev);
+ 	if (name == NULL)
+@@ -793,7 +793,10 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
+ 	args = rte_vdev_device_args(vdev);
+ 
+ 	init_params.private_data_size = sizeof(struct mrvl_crypto_private);
+-	init_params.max_nb_queue_pairs = sam_get_num_inst() * SAM_HW_RING_NUM;
++
++	for (i = 0; i < sam_get_num_inst(); i++)
++		init_params.max_nb_queue_pairs += sam_get_num_cios(i);
++
+ 	init_params.max_nb_sessions =
+ 		RTE_CRYPTODEV_PMD_DEFAULT_MAX_NB_SESSIONS;
+ 	init_params.socket_id = rte_socket_id();
+-- 
+2.7.4
+

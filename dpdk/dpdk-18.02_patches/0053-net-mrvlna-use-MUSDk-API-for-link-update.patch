@@ -1,0 +1,59 @@
+From 7317fc875206531d2d3f19836e69b10f0792033b Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 15 Mar 2018 13:04:48 +0100
+Subject: [PATCH 53/74] net/mrvlna: use MUSDk API for link update
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index f1e98df..175e387 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -733,7 +733,7 @@ mrvlna_mtu_set(struct rte_eth_dev *dev, uint16_t mtu)
+ 	if (!priv->ppio)
+ 		return -EPERM;
+ 
+-	/* TODO no this has no effect as mtu set only during initialization */
++	/* TODO note this has no effect as mtu set only during initialization */
+ 	priv->ppio_params.inqs_params.mtu = mtu;
+ 
+ 	/* TODO below functions cause hardware undefined behaviour, skipped for now */
+@@ -988,6 +988,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 		if (!txq->tx_deferred_start)
+ 			continue;
+ 
++		/* TODO */
+ 		/*
+ 		 * All txqs are started by default. Stop them
+ 		 * so that tx_deferred_start works as expected.
+@@ -1082,13 +1083,6 @@ mrvlna_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
+ 		return -EFAULT;
+ 	}
+ 
+-	ret = ioctl(fd, SIOCGIFFLAGS, &req);
+-	if (ret == -1) {
+-		close(fd);
+-		return -EFAULT;
+-	}
+-	link_up = (req.ifr_flags & IFF_RUNNING);
+-
+ 	close(fd);
+ 
+ 	switch (ethtool_cmd_speed(&edata)) {
+@@ -1113,10 +1107,7 @@ mrvlna_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
+ 	dev->data->dev_link.link_autoneg = edata.autoneg ? ETH_LINK_AUTONEG :
+ 							   ETH_LINK_FIXED;
+ 
+-	/*
+-	 * This function is declared but not implemented in MUSDK
+-	 */
+-/*	neta_ppio_get_link_state(priv->ppio, &link_up); */
++	neta_ppio_get_link_state(priv->ppio, &link_up);
+ 	dev->data->dev_link.link_status = link_up ? ETH_LINK_UP : ETH_LINK_DOWN;
+ 
+ 	return 0;
+-- 
+2.7.4
+

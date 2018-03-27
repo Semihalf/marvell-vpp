@@ -1,0 +1,72 @@
+From f40d019ecddae5af1e5a5a7ac48395c938593487 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 8 Mar 2018 15:26:13 +0100
+Subject: [PATCH 43/74] mrvlna: fix buffer allocation
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 27 ++++++++++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 02a5c22..d3bfe05 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -57,6 +57,9 @@
+ 
+ #define MRVLNA_COOKIE_ADDR_INVALID ~0ULL
+ 
++#define MRVLNA_COOKIE_HIGH_ADDR_SHIFT	(sizeof(neta_cookie_t) * 8)
++#define MRVLNA_COOKIE_HIGH_ADDR_MASK	(~0ULL << MRVLNA_COOKIE_HIGH_ADDR_SHIFT)
++
+ #define MRVLNA_MUSDK_DMA_MEMSIZE 41943040 /* (40 * 1024 * 1024) */
+ 
+ #define MRVLNA_PKT_SIZE_MAX (16382 - MV_MH_SIZE) /* 9700B */
+@@ -150,6 +153,21 @@ mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq)
+ 		RTE_LOG(ERR, PMD,
+ 				"Failed to allocate %u mbufs.\n", nb_desc);
+ 
++
++	if (cookie_addr_high == MRVLNA_COOKIE_ADDR_INVALID)
++		cookie_addr_high =
++			(uint64_t)mbufs[0] & MRVLNA_COOKIE_HIGH_ADDR_MASK;
++
++	for (i = 0; i < nb_desc; i++) {
++		if (((uint64_t)mbufs[i] & MRVLNA_COOKIE_HIGH_ADDR_MASK)
++			!= cookie_addr_high) {
++			RTE_LOG(ERR, PMD,
++				"mbuf virtual addr high 0x%lx out of range\n",
++				(uint64_t)mbufs[i] >> 32);
++			goto out;
++		}
++	}
++
+ 	for (i = 0; i < nb_desc; i++) {
+ 		entries[i].addr = rte_mbuf_data_iova_default(mbufs[i]);
+ 		entries[i].cookie = (neta_cookie_t)(uint64_t)mbufs[i];
+@@ -162,6 +180,12 @@ mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq)
+ 	}
+ 
+ 	return 0;
++
++out:
++	for (; i < nb_desc; i++)
++		rte_pktmbuf_free(mbufs[i]);
++
++	return -1;
+ }
+ 
+ /**
+@@ -529,8 +553,9 @@ mrvlna_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+ 		uint64_t addr;
+ 
+ 		addr = cookie_addr_high |
+-			   neta_ppio_inq_desc_get_cookie(&descs[i]);
++			neta_ppio_inq_desc_get_cookie(&descs[i]);
+ 		mbuf = (struct rte_mbuf *)addr;
++
+ 		rte_pktmbuf_reset(mbuf);
+ 
+ 		/* drop packet in case of mac, overrun or resource error */
+-- 
+2.7.4
+

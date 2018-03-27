@@ -1,0 +1,62 @@
+From 94e014a91b46b046375c8dbbc31e44f3afb9cbcc Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Fri, 23 Mar 2018 07:59:04 +0100
+Subject: [PATCH 74/74] net/mvneta: change remaining ambiguous name
+
+---
+ drivers/net/mvneta/mvneta_ethdev.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/mvneta/mvneta_ethdev.c b/drivers/net/mvneta/mvneta_ethdev.c
+index 5644b2b..9776285 100644
+--- a/drivers/net/mvneta/mvneta_ethdev.c
++++ b/drivers/net/mvneta/mvneta_ethdev.c
+@@ -24,8 +24,7 @@
+ #include "mvneta_ethdev.h"
+ 
+ 
+-#define MRVL_IFACE_NAME_ARG "iface"
+-#define MRVL_CFG_ARG "cfg"
++#define MVNETA_IFACE_NAME_ARG "iface"
+ 
+ #define MVNETA_COOKIE_ADDR_INVALID ~0ULL
+ 
+@@ -47,7 +46,7 @@ uint64_t cookie_addr_high = MVNETA_COOKIE_ADDR_INVALID;
+ uint16_t rx_desc_free_thresh = MRVL_NETA_BUF_RELEASE_BURST_SIZE;
+ 
+ static const char * const valid_args[] = {
+-	MRVL_IFACE_NAME_ARG,
++	MVNETA_IFACE_NAME_ARG,
+ 	NULL
+ };
+ 
+@@ -402,9 +401,9 @@ mvneta_desc_to_packet_type_and_offset(struct neta_ppio_desc *desc,
+  * @param packet_type
+  *   Packet type bitfield.
+  * @param l3_type
+- *   Pointer to the pp2_ouq_l3_type structure.
++ *   Pointer to the neta_ouq_l3_type structure.
+  * @param l4_type
+- *   Pointer to the pp2_outq_l4_type structure.
++ *   Pointer to the neta_outq_l4_type structure.
+  * @param gen_l3_cksum
+  *   Will be set to 1 in case l3 checksum is computed.
+  * @param l4_cksum
+@@ -1295,12 +1294,12 @@ rte_pmd_mvneta_probe(struct rte_vdev_device *vdev)
+ 	if (!kvlist)
+ 		return -EINVAL;
+ 
+-	ifnum = rte_kvargs_count(kvlist, MRVL_IFACE_NAME_ARG);
++	ifnum = rte_kvargs_count(kvlist, MVNETA_IFACE_NAME_ARG);
+ 	if (ifnum > RTE_DIM(ifnames.names))
+ 		goto out_free_kvlist;
+ 
+ 	ifnames.idx = 0;
+-	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
++	rte_kvargs_process(kvlist, MVNETA_IFACE_NAME_ARG,
+ 			   mvneta_ifnames_get, &ifnames);
+ 
+ 	/*
+-- 
+2.7.4
+

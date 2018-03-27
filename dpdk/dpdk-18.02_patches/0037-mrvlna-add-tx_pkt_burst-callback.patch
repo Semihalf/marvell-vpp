@@ -1,0 +1,92 @@
+From 0f6bd1036b31aeb53c177e715d52653fade982c8 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 5 Mar 2018 15:58:42 +0100
+Subject: [PATCH 37/74] mrvlna: add tx_pkt_burst callback
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 68 ++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 66 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 4efe054..3c0c832 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -366,9 +366,73 @@ mrvlna_ifnames_get(const char *key __rte_unused, const char *value,
+  *   Number of packets successfully transmitted.
+  */
+ static uint16_t
+-mrvlna_tx_pkt_burst(void *txq __rte_unused, struct rte_mbuf **tx_pkts __rte_unused, uint16_t nb_pkts __rte_unused)
++mrvlna_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ {
+-	return 0;
++	struct neta_txq *q = txq;
++	struct neta_shadow_txq *sq;
++	struct neta_ppio_desc descs[nb_pkts];
++	unsigned int core_id = rte_lcore_id();
++
++	int i, bytes_sent = 0;
++	uint16_t num, sq_free_size;
++	uint64_t addr;
++
++	sq = &q->shadow_txqs[core_id];
++	if (unlikely(!q->priv->ppio))
++		return 0;
++
++	if (sq->size)
++		mrvlna_sent_buffers_free(q->priv->ppio,
++				sq, q->queue_id, q->qlen_mask, 0);
++
++	sq_free_size = MRVL_NETA_TX_SHADOWQ_SIZE - sq->size - 1;
++	if (unlikely(nb_pkts > sq_free_size)) {
++		RTE_LOG(DEBUG, PMD,
++			"No room in shadow queue for %d packets! %d packets will be sent.\n",
++			nb_pkts, sq_free_size);
++		nb_pkts = sq_free_size;
++	}
++
++
++	for (i = 0; i < nb_pkts; i++) {
++		struct rte_mbuf *mbuf = tx_pkts[i];
++
++		sq->ent[sq->head].cookie = (neta_cookie_t)(uint64_t)mbuf;
++		sq->ent[sq->head].addr = rte_mbuf_data_iova_default(mbuf);
++		sq->head = (sq->head + 1) & MRVL_NETA_TX_SHADOWQ_MASK;
++		sq->size++;
++
++		neta_ppio_outq_desc_reset(&descs[i]);
++		neta_ppio_outq_desc_set_phys_addr(&descs[i],
++						 rte_pktmbuf_iova(mbuf));
++		neta_ppio_outq_desc_set_pkt_offset(&descs[i], MRVLNA_PKT_EFFEC_OFFS);
++		neta_ppio_outq_desc_set_pkt_len(&descs[i],
++					       rte_pktmbuf_pkt_len(mbuf) - (ETH_FCS_LEN + MV_MH_SIZE));
++
++		bytes_sent += rte_pktmbuf_pkt_len(mbuf);
++
++		/* TODO : prepare & set proto info in the descriptor */
++
++	}
++	num = nb_pkts;
++	neta_ppio_send(q->priv->ppio, q->queue_id, descs, &nb_pkts);
++
++
++	/* number of packets that were not sent */
++	if (unlikely(num > nb_pkts)) {
++		for (i = nb_pkts; i < num; i++) {
++			sq->head = (MRVL_NETA_TX_SHADOWQ_SIZE + sq->head - 1) &
++				MRVL_NETA_TX_SHADOWQ_MASK;
++			addr = cookie_addr_high | sq->ent[sq->head].cookie;
++			bytes_sent -=
++				rte_pktmbuf_pkt_len((struct rte_mbuf *)addr);
++		}
++		sq->size -= num - nb_pkts;
++	}
++
++	q->bytes_sent += bytes_sent;
++
++	return nb_pkts;
+ }
+ 
+ /**
+-- 
+2.7.4
+

@@ -1,0 +1,248 @@
+From 95ee98b9ba9fff980b4c7fb4619cecebe7efb43d Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 15 Feb 2018 16:46:37 +0100
+Subject: [PATCH 13/74] mrvlna: add rx_queue_setup/release callback
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 172 ++++++++++++++++++++++++++-----------
+ drivers/net/mrvlna/mrvlna_ethdev.h |   3 +-
+ 2 files changed, 122 insertions(+), 53 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 5bbe6fe..2c198f0 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -76,6 +76,16 @@ struct mrvlna_ifnames {
+ 	int idx;
+ };
+ 
++struct neta_rxq {
++	struct neta_priv *priv;
++	struct rte_mempool *mp;
++	int queue_id;
++	int port_id;
++	int cksum_enabled;
++	uint64_t bytes_recv;
++	uint64_t drop_mac;
++};
++
+ static int mrvlna_dev_num;
+ static int mrvlna_lcore_first;
+ static int mrvlna_lcore_last;
+@@ -131,44 +141,6 @@ mrvlna_get_ifnames(const char *key __rte_unused, const char *value,
+ }
+ 
+ /**
+- * Configure TX Queues in a given port.
+- *
+- * Sets up TX queues egress scheduler and limiter.
+- *
+- * @param priv Port's private data
+- * @param portid DPDK port ID
+- * @param max_queues Maximum number of queues to configure.
+- * @returns 0 in case of success, negative value otherwise.
+- */
+-static int
+-mrvlna_configure_txqs(struct neta_priv *priv __rte_unused, uint16_t portid __rte_unused,
+-		uint16_t max_queues)
+-{
+-	/* We need only a subset of configuration. */
+-	//TODO skad wziac port_cfg??
+-//	struct port_cfg *port_cfg = &mrvl_qos_cfg->port[portid];
+-	int i;
+-
+-//	if (mrvl_qos_cfg == NULL)
+-//		return 0;
+-
+-//	priv->ppio_params.rate_limit_enable = port_cfg->rate_limit_enable;
+-//	if (port_cfg->rate_limit_enable)
+-//		priv->ppio_params.rate_limit_params =
+-//			port_cfg->rate_limit_params;
+-
+-	for (i = 0; i < max_queues; i++) {
+-		struct neta_ppio_outq_params *params =
+-			&priv->ppio_params.outqs_params.outqs_params[i];
+-
+-		params->size = 64;//port_cfg->outq[i].size;
+-		params->weight = 1;//port_cfg->outq[i].weight;
+-	}
+-
+-	return 0;
+-}
+-
+-/**
+  * DPDK callback for transmit.
+  *
+  * @param txq
+@@ -222,7 +194,6 @@ static int
+ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+-	int ret;
+ 
+ 	if (dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_NONE) {
+ 		RTE_LOG(INFO, PMD, "Unsupported RSS and rx multi queue mode %d\n",
+@@ -260,19 +231,16 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 		dev->data->mtu = dev->data->dev_conf.rxmode.max_rx_pkt_len -
+ 				 ETHER_HDR_LEN - ETHER_CRC_LEN;
+ 
+-//	ret = mrvl_configure_rxqs(priv, dev->data->port_id,
+-//				  dev->data->nb_rx_queues);
+-//	if (ret < 0)
+-//		return ret;
+-
+-	ret = mrvlna_configure_txqs(priv, dev->data->port_id,
+-				  dev->data->nb_tx_queues);
+-	if (ret < 0)
+-		return ret;
+-
+ 	priv->ppio_params.outqs_params.num_outqs = dev->data->nb_tx_queues;
+ 	priv->nb_rx_queues = dev->data->nb_rx_queues;
+ 
++	/*
++	 * Default: 1 TC, no QoS supported.
++	 */
++	priv->ppio_params.inqs_params.num_tcs = 1;
++	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_PKT_OFFS;
++
++
+ 	return 0;
+ }
+ 
+@@ -320,6 +288,108 @@ mrvlna_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
+ 	info->max_rx_pktlen = MRVLNA_PKT_SIZE_MAX;
+ }
+ 
++/**
++ * DPDK callback to configure the receive queue.
++ *
++ * @param dev
++ *   Pointer to Ethernet device structure.
++ * @param idx
++ *   RX queue index.
++ * @param desc
++ *   Number of descriptors to configure in queue.
++ * @param socket
++ *   NUMA socket on which memory must be allocated.
++ * @param conf
++ *   Thresholds parameters (unused_).
++ * @param mp
++ *   Memory pool for buffer allocations.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
++		    unsigned int socket,
++		    const struct rte_eth_rxconf *conf __rte_unused,
++		    struct rte_mempool *mp)
++{
++	struct neta_priv *priv = dev->data->dev_private;
++	struct neta_rxq *rxq;
++	uint32_t min_size,
++		 max_rx_pkt_len = dev->data->dev_conf.rxmode.max_rx_pkt_len;
++
++	min_size = rte_pktmbuf_data_room_size(mp) - RTE_PKTMBUF_HEADROOM -
++		   MRVLNA_PKT_EFFEC_OFFS;
++	if (min_size < max_rx_pkt_len) {
++		RTE_LOG(ERR, PMD,
++			"Mbuf size must be increased to %u bytes to hold up to %u bytes of data.\n",
++			max_rx_pkt_len + RTE_PKTMBUF_HEADROOM +
++			MRVLNA_PKT_EFFEC_OFFS,
++			max_rx_pkt_len);
++		return -EINVAL;
++	}
++
++	if (dev->data->rx_queues[idx]) {
++		rte_free(dev->data->rx_queues[idx]);
++		dev->data->rx_queues[idx] = NULL;
++	}
++
++	rxq = rte_zmalloc_socket("rxq", sizeof(*rxq), 0, socket);
++	if (!rxq)
++		return -ENOMEM;
++
++	rxq->priv = priv;
++	rxq->mp = mp;
++	rxq->cksum_enabled = dev->data->dev_conf.rxmode.hw_ip_checksum;
++	rxq->queue_id = idx;
++	rxq->port_id = dev->data->port_id;
++
++	//TODO bpool management
++//	mrvl_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
++
++
++	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
++		desc;
++
++	//TODO alloc mbufs
++	// here
++
++
++	priv->bpool_init_size += desc;
++
++	dev->data->rx_queues[idx] = rxq;
++
++	return 0;
++}
++
++/**
++ * DPDK callback to release the receive queue.
++ *
++ * @param rxq
++ *   Generic receive queue pointer.
++ */
++static void
++mrvlna_rx_queue_release(void *rxq)
++{
++	struct neta_rxq *q = rxq;
++	struct neta_ppio_tc_params *tc_params;
++	int i, num;
++	unsigned int core_id = rte_lcore_id();
++
++	if (core_id == LCORE_ID_ANY)
++		core_id = 0;
++
++	tc_params = &q->priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC];
++	num = tc_params->size;
++	for (i = 0; i < num; i++) {
++		//TODO free alloc mbufs
++		//here
++
++	}
++
++	rte_free(q);
++}
++
+ static const struct eth_dev_ops mrvlna_ops = {
+ 	.dev_configure = mrvlna_dev_configure,
+ //	.dev_start = ,
+@@ -340,8 +410,8 @@ static const struct eth_dev_ops mrvlna_ops = {
+ //	.txq_info_get = ,
+ //	.tx_queue_start = ,
+ //	.tx_queue_stop = ,
+-//	.rx_queue_setup = ,
+-//	.rx_queue_release = ,
++	.rx_queue_setup = mrvlna_rx_queue_setup,
++	.rx_queue_release = mrvlna_rx_queue_release,
+ //	.tx_queue_setup = ,
+ //	.tx_queue_release = ,
+ };
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 5d57eeb..0ca1b30 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -70,8 +70,7 @@
+ /** Rx queue descriptors alignment in B */
+ #define MRVL_NETA_RXD_ALIGN 32
+ 
+-/** Packet offset inside RX buffer. */
+-#define MRVL_PKT_OFFS 64
++#define MRVL_NETA_DEFAULT_TC 0
+ 
+ ///** Maximum number of descriptors in shadow queue. Must be power of 2 */
+ //#define MRVL_NETA_TX_SHADOWQ_SIZE MRVL_NETA_TXD_MAX
+-- 
+2.7.4
+

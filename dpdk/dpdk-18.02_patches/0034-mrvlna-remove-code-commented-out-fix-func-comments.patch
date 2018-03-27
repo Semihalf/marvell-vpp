@@ -1,0 +1,83 @@
+From fdc4ad9808cd57ad781606fe5f257fe2034304e0 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 1 Mar 2018 16:18:09 +0100
+Subject: [PATCH 34/74] mrvlna: remove code commented out; fix func comments
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 11 +++++++----
+ drivers/net/mrvlna/mrvlna_ethdev.h | 14 +-------------
+ 2 files changed, 8 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 318cf2a..0dafc26 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -166,6 +166,11 @@ mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq)
+ 
+ /**
+  * Return mbufs to mempool.
++ *
++ * @param rxq
++ *    Pointer to rx queue structure
++ * @param desc
++ *    Array of rx descriptors
+  */
+ static void
+ mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+@@ -189,12 +194,12 @@ mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+  *
+  * @param ppio
+  *   Pointer to the port structure.
+- * @param hif
+- *   Pointer to the MUSDK hardware interface.
+  * @param sq
+  *   Pointer to the shadow queue.
+  * @param qid
+  *   Queue id number.
++ * @param qlen_mask
++ *   Queue size mask
+  * @param force
+  *   Force releasing packets.
+  */
+@@ -865,8 +870,6 @@ mrvlna_priv_create(const char *dev_name)
+ 		goto out_free_priv;*/
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+-//	priv->ppio_params.type = PP2_PPIO_T_NIC;
+-//	rte_spinlock_init(&priv->lock);
+ 
+ 	return priv;
+ 
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index e4e09d1..4042479 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -88,24 +88,12 @@ struct neta_priv {
+ 	struct neta_ppio	*ppio;    /**< Port handler pointer */
+ 	uint8_t bpool_en;
+ 
+-	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
+-//	struct {
+-//		uint8_t tc;  /**< Traffic Class */
+-//		uint8_t inq; /**< Relative in-queue number */
+-//	} rxq_map[MRVL_PP2_RXQ_MAX] __rte_cache_aligned;
+-
+-	/* Configuration data, used sporadically. */
+ 	uint8_t pp_id;
+-	uint8_t ppio_id;
+-//	uint8_t uc_mc_flushed;
+-//	uint8_t vlan_flushed;
+-//	uint8_t isolated;
++	uint8_t ppio_id;	/* ppio port id */
+ 
+ 	struct neta_ppio_params ppio_params;
+ 	uint16_t nb_rx_queues;
+ 
+-//	LIST_HEAD(shaper_profiles, mrvl_tm_shaper_profile) shaper_profiles;
+-//	LIST_HEAD(nodes, mrvl_tm_node) nodes;
+ 	uint64_t rate_max;
+ };
+ 
+-- 
+2.7.4
+

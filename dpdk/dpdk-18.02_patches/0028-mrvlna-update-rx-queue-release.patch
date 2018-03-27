@@ -1,0 +1,79 @@
+From fce2179dce9d1f02964891fe27b5b2f69b0bbfb6 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 28 Feb 2018 10:19:25 +0100
+Subject: [PATCH 28/74] mrvlna: update rx queue release
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 23 ++++-------------------
+ 1 file changed, 4 insertions(+), 19 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 47697a5..f9a48cc 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -158,7 +158,6 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD,
+ 				"Failed to fill rx desc\n");
+-		rte_free(rxq);
+ 		return ret;
+ 	}
+ 
+@@ -169,7 +168,7 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+  * Return mbufs to mempool.
+  */
+ static void
+-mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct neta_ppio_desc *desc)
++mrvlna_free_buffs(struct neta_priv *priv, struct neta_ppio_desc *desc)
+ {
+ 	uint64_t addr;
+ 	uint8_t i;
+@@ -183,8 +182,6 @@ mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct neta_ppio
+ 			desc++;
+ 		}
+ 	}
+-
+-	rte_free(rxq);
+ }
+ 
+ /**
+@@ -483,25 +480,12 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ static void
+ mrvlna_rx_queue_release(void *rxq)
+ {
+-	struct neta_rxq *q = rxq;
+-	struct neta_ppio_tc_params *tc_params;
+-	int i, num;
+ 	unsigned int core_id = rte_lcore_id();
+ 
+ 	if (core_id == LCORE_ID_ANY)
+ 		core_id = 0;
+ 
+-	tc_params = &q->priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC];
+-	num = tc_params->size;
+-	for (i = 0; i < num; i++) {
+-		//TODO free alloc mbufs
+-		//here
+-	//	rte_pktmbuf_free((struct rte_mbuf *)q->descs);
+-		//mbuf in rx need to be relas in case of dev_stop or dev_open failure !! TODO
+-
+-	}
+-
+-	rte_free(q);
++	rte_free(rxq);
+ }
+ 
+ /**
+@@ -647,7 +631,8 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 		struct neta_ppio_desc descs[MRVL_NETA_RXD_MAX];
+ 
+ 		mrvlna_flush_rx_queue(rxq, descs);
+-		mrvlna_free_buffs(priv, rxq, descs);
++		mrvlna_free_buffs(priv, descs);
++		mrvlna_rx_queue_release(rxq);
+ 	}
+ 
+ 	neta_ppio_deinit(priv->ppio);
+-- 
+2.7.4
+

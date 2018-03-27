@@ -1,0 +1,146 @@
+From 2e3dcfae801194277dbafd0005b1ccbc1a178f6f Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 5 Mar 2018 19:07:15 +0100
+Subject: [PATCH 38/74] mrvlna: add rx_pkt_burst
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 115 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 113 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 3c0c832..02389ce 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -353,6 +353,62 @@ mrvlna_ifnames_get(const char *key __rte_unused, const char *value,
+ }
+ 
+ /**
++ * Return packet type information and l3/l4 offsets.
++ *
++ * @param desc
++ *   Pointer to the received packet descriptor.
++ * @param l3_offset
++ *   l3 packet offset.
++ * @param l4_offset
++ *   l4 packet offset.
++ *
++ * @return
++ *   Packet type information.
++ */
++static inline uint64_t
++mrvlna_desc_to_packet_type_and_offset(struct neta_ppio_desc *desc,
++				    uint8_t *l3_offset, uint8_t *l4_offset)
++{
++	enum neta_inq_l3_type l3_type;
++	enum neta_inq_l4_type l4_type;
++	uint64_t packet_type;
++
++	neta_ppio_inq_desc_get_l3_info(desc, &l3_type, l3_offset);
++	neta_ppio_inq_desc_get_l4_info(desc, &l4_type, l4_offset);
++
++	packet_type = RTE_PTYPE_L2_ETHER;
++
++	switch (l3_type) {
++	case NETA_INQ_L3_TYPE_IPV4_BAD:
++	case NETA_INQ_L3_TYPE_IPV4_OK:
++		packet_type |= RTE_PTYPE_L3_IPV4;
++		break;
++	case NETA_INQ_L3_TYPE_IPV6:
++		packet_type |= RTE_PTYPE_L3_IPV6;
++		break;
++	default:
++		packet_type |= RTE_PTYPE_UNKNOWN;
++		RTE_LOG(DEBUG, PMD, "Failed to recognize l3 packet type\n");
++		break;
++	}
++
++	switch (l4_type) {
++	case NETA_INQ_L4_TYPE_TCP:
++		packet_type |= RTE_PTYPE_L4_TCP;
++		break;
++	case NETA_INQ_L4_TYPE_UDP:
++		packet_type |= RTE_PTYPE_L4_UDP;
++		break;
++	default:
++		packet_type |= RTE_PTYPE_UNKNOWN;
++		RTE_LOG(DEBUG, PMD, "Failed to recognize l4 packet type\n");
++		break;
++	}
++
++	return packet_type;
++}
++
++/**
+  * DPDK callback for transmit.
+  *
+  * @param txq
+@@ -449,9 +505,64 @@ mrvlna_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+  *   Number of packets successfully received.
+  */
+ static uint16_t
+-mrvlna_rx_pkt_burst(void *rxq __rte_unused, struct rte_mbuf **rx_pkts __rte_unused, uint16_t nb_pkts __rte_unused)
++mrvlna_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+ {
+-	return 0;
++	struct neta_rxq *q = rxq;
++	struct neta_ppio_desc descs[nb_pkts];
++	int i, ret, rx_done = 0;
++
++	if (unlikely(!q->priv->ppio))
++		return 0;
++
++	ret = neta_ppio_recv(q->priv->ppio, q->queue_id,
++			descs, &nb_pkts);
++
++	if (unlikely(ret < 0)) {
++		RTE_LOG(ERR, PMD, "Failed to receive packets\n");
++		return 0;
++	}
++
++	for (i = 0; i < nb_pkts; i++) {
++		struct rte_mbuf *mbuf;
++		uint8_t l3_offset, l4_offset;
++		enum neta_inq_desc_status status;
++		uint64_t addr;
++
++		addr = cookie_addr_high |
++			   neta_ppio_inq_desc_get_cookie(&descs[i]);
++		mbuf = (struct rte_mbuf *)addr;
++		rte_pktmbuf_reset(mbuf);
++
++		/* drop packet in case of mac, overrun or resource error */
++		status = neta_ppio_inq_desc_get_l2_pkt_error(&descs[i]);
++		if (unlikely(status != NETA_DESC_ERR_OK)) {
++			/* TODO do we need to release it to mempool here? or if we resettet it shall it be reused and free when dev_stop? */
++			q->drop_mac++;
++			continue;
++		}
++
++		mbuf->data_off += MRVLNA_PKT_EFFEC_OFFS;
++		mbuf->pkt_len = neta_ppio_inq_desc_get_pkt_len(&descs[i]);
++		mbuf->data_len = mbuf->pkt_len;
++		mbuf->port = q->port_id;
++		mbuf->packet_type =
++			mrvlna_desc_to_packet_type_and_offset(&descs[i],
++								&l3_offset,
++								&l4_offset);
++		mbuf->l2_len = l3_offset;
++		mbuf->l3_len = l4_offset - l3_offset;
++
++		/* TODO recv checksum */
++//		if (likely(q->cksum_enabled))
++//			mbuf->ol_flags = mrvl_desc_to_ol_flags(&descs[i]);
++
++		rx_pkts[rx_done++] = mbuf;
++		q->bytes_recv += mbuf->pkt_len;
++	}
++
++	/* TODO refill or free mbufs according to needs */
++
++	return rx_done;
+ }
+ 
+ /**
+-- 
+2.7.4
+

@@ -1,0 +1,62 @@
+From 77ea0cb2668f3f7c3503f7ed904548ee6f6398b3 Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Fri, 2 Mar 2018 14:23:14 +0100
+Subject: [PATCH 06/74] app/crypto-perf: fix test vectors check in ECB mode
+
+ECB mode does not use initialization vectors thus
+their presence should not be checked.
+
+Fixes: f8be1786b1b8 ("app/crypto-perf: introduce performance test
+application")
+Cc: slawomirx.mrozowicz@intel.com
+
+Signed-off-by: Tomasz Duszynski <tdu@semihalf.com>
+---
+ app/test-crypto-perf/main.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/app/test-crypto-perf/main.c b/app/test-crypto-perf/main.c
+index 019d835..aef8344 100644
+--- a/app/test-crypto-perf/main.c
++++ b/app/test-crypto-perf/main.c
+@@ -292,10 +292,14 @@ cperf_check_test_vector(struct cperf_options *opts,
+ 				return -1;
+ 			if (test_vec->ciphertext.length < opts->max_buffer_size)
+ 				return -1;
+-			if (test_vec->cipher_iv.data == NULL)
+-				return -1;
+-			if (test_vec->cipher_iv.length != opts->cipher_iv_sz)
+-				return -1;
++			if ((opts->cipher_algo != RTE_CRYPTO_CIPHER_3DES_ECB) &&
++			    (opts->cipher_algo != RTE_CRYPTO_CIPHER_AES_ECB)) {
++				if (test_vec->cipher_iv.data == NULL)
++					return -1;
++				if (test_vec->cipher_iv.length !=
++						opts->cipher_iv_sz)
++					return -1;
++			}
+ 			if (test_vec->cipher_key.data == NULL)
+ 				return -1;
+ 			if (test_vec->cipher_key.length != opts->cipher_key_sz)
+@@ -338,10 +342,14 @@ cperf_check_test_vector(struct cperf_options *opts,
+ 				return -1;
+ 			if (test_vec->ciphertext.length < opts->max_buffer_size)
+ 				return -1;
+-			if (test_vec->cipher_iv.data == NULL)
+-				return -1;
+-			if (test_vec->cipher_iv.length != opts->cipher_iv_sz)
+-				return -1;
++			if ((opts->cipher_algo != RTE_CRYPTO_CIPHER_3DES_ECB) &&
++			    (opts->cipher_algo != RTE_CRYPTO_CIPHER_AES_ECB)) {
++				if (test_vec->cipher_iv.data == NULL)
++					return -1;
++				if (test_vec->cipher_iv.length !=
++						opts->cipher_iv_sz)
++					return -1;
++			}
+ 			if (test_vec->cipher_key.data == NULL)
+ 				return -1;
+ 			if (test_vec->cipher_key.length != opts->cipher_key_sz)
+-- 
+2.7.4
+
