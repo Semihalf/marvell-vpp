@@ -1,0 +1,77 @@
+From 5c6772a6abc542c8fefd965f8f5a8607e15d9976 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Sun, 18 Mar 2018 10:17:38 +0100
+Subject: [PATCH 59/74] net/mrvlna: fix dev_start when called the consecutive
+ times
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 378c59a..7407865 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -604,7 +604,6 @@ static int
+ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+-	char match[MRVLNA_MATCH_LEN];
+ 
+ 	if (dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_NONE) {
+ 		RTE_LOG(INFO, PMD, "Unsupported RSS and rx multi queue mode %d\n",
+@@ -647,9 +646,6 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 	/* Default: 1 TC, no QoS supported. */
+ 	priv->ppio_params.inqs_params.num_tcs = 1;
+ 	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_NETA_PKT_OFFS;
+-	priv->ppio_id = dev->data->port_id;
+-	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
+-	priv->ppio_params.match = match;
+ 	/* TODO check if DPDK has already set mtu to default value */
+ 	priv->ppio_params.inqs_params.mtu = dev->data->mtu ? dev->data->mtu : MRVLNA_DEFAULT_MTU;
+ 
+@@ -949,13 +945,19 @@ static int
+ mrvlna_dev_start(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
++	char match[MRVLNA_MATCH_LEN];
+ 	int ret = 0, i;
+ 
++	priv->ppio_id = dev->data->port_id;
++	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
++	priv->ppio_params.match = match;
++
+ 	ret = neta_ppio_init(&priv->ppio_params, &priv->ppio);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init ppio\n");
+ 		return ret;
+ 	}
++	/* Unify port id with MUSDK */
+ 	priv->ppio_id = priv->ppio->port_id;
+ 
+ 	/* Allocate buffers */
+@@ -1022,7 +1024,6 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 		struct neta_ppio_desc descs[MRVL_NETA_RXD_MAX];
+ 
+ 		mrvlna_rx_queue_flush(rxq, descs);
+-		mrvlna_rx_queue_release(rxq);
+ 	}
+ 
+ 	RTE_LOG(INFO, PMD, "Flushing tx queues\n");
+@@ -1030,12 +1031,11 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 		struct neta_txq *txq = dev->data->tx_queues[i];
+ 
+ 		mrvlna_tx_queue_flush(txq);
+-		mrvlna_tx_queue_release(txq);
+ 	}
+ 
+ 	neta_ppio_deinit(priv->ppio);
+ 
+-	priv = NULL;
++	priv->ppio = NULL;
+ }
+ 
+ /**
+-- 
+2.7.4
+

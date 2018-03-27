@@ -1,0 +1,39 @@
+From 0407e57827c7f00e7f532c18a9ee88948535853b Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 20 Mar 2018 19:06:11 +0100
+Subject: [PATCH 69/74] Revert "crypto/mrvl: use a new API for counting queue
+ pairs"
+
+This reverts commit 87cd6a9c2701dfbc7aa0a9807dd35dea05ef1bc3.
+---
+ drivers/crypto/mrvl/rte_mrvl_pmd.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd.c b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+index e7aa6fe..25fe915 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+@@ -799,7 +799,7 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
+ {
+ 	struct rte_cryptodev_pmd_init_params init_params = { };
+ 	const char *name, *args;
+-	int ret, i;
++	int ret;
+ 
+ 	name = rte_vdev_device_name(vdev);
+ 	if (name == NULL)
+@@ -807,10 +807,7 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
+ 	args = rte_vdev_device_args(vdev);
+ 
+ 	init_params.private_data_size = sizeof(struct mrvl_crypto_private);
+-
+-	for (i = 0; i < sam_get_num_inst(); i++)
+-		init_params.max_nb_queue_pairs += sam_get_num_cios(i);
+-
++	init_params.max_nb_queue_pairs = sam_get_num_inst() * SAM_HW_RING_NUM;
+ 	init_params.max_nb_sessions =
+ 		RTE_CRYPTODEV_PMD_DEFAULT_MAX_NB_SESSIONS;
+ 	init_params.socket_id = rte_socket_id();
+-- 
+2.7.4
+

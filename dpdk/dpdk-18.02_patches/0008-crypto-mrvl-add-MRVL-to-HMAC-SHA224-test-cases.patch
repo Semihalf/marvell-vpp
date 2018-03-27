@@ -1,0 +1,39 @@
+From 4814679e4693e71a5e6d2349702cba4ef6e3e5ae Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Mon, 5 Mar 2018 09:05:07 +0100
+Subject: [PATCH 08/74] crypto/mrvl: add MRVL to HMAC SHA224 test cases
+
+Add MRVL Crypto PMD to the HMAC SHA224 test cases.
+
+Signed-off-by: Tomasz Duszynski <tdu@semihalf.com>
+---
+ test/test/test_cryptodev_hash_test_vectors.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/test/test/test_cryptodev_hash_test_vectors.h b/test/test/test_cryptodev_hash_test_vectors.h
+index df9202f..3466b11 100644
+--- a/test/test/test_cryptodev_hash_test_vectors.h
++++ b/test/test/test_cryptodev_hash_test_vectors.h
+@@ -435,7 +435,8 @@ static const struct blockcipher_test_case hash_test_cases[] = {
+ 			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+ 			BLOCKCIPHER_TEST_TARGET_PMD_DPAA2_SEC |
+ 			BLOCKCIPHER_TEST_TARGET_PMD_DPAA_SEC |
+-			BLOCKCIPHER_TEST_TARGET_PMD_QAT
++			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
++			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
+ 	},
+ 	{
+ 		.test_descr = "HMAC-SHA224 Digest Verify",
+@@ -446,7 +447,8 @@ static const struct blockcipher_test_case hash_test_cases[] = {
+ 			BLOCKCIPHER_TEST_TARGET_PMD_SCHEDULER |
+ 			BLOCKCIPHER_TEST_TARGET_PMD_DPAA2_SEC |
+ 			BLOCKCIPHER_TEST_TARGET_PMD_DPAA_SEC |
+-			BLOCKCIPHER_TEST_TARGET_PMD_QAT
++			BLOCKCIPHER_TEST_TARGET_PMD_QAT |
++			BLOCKCIPHER_TEST_TARGET_PMD_MRVL
+ 	},
+ 	{
+ 		.test_descr = "SHA256 Digest",
+-- 
+2.7.4
+

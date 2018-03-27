@@ -1,0 +1,22 @@
+From c21bdcd874834d71980dc0d944bb8e567fec0df5 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 26 Feb 2018 12:21:21 +0100
+Subject: [PATCH 18/74] git: adjust .gitignore list
+
+---
+ .gitignore | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/.gitignore b/.gitignore
+index 6df5ba0..c919afc 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -12,3 +12,5 @@ GPATH
+ GRTAGS
+ tags
+ TAGS
++test/*
++examples*
+-- 
+2.7.4
+

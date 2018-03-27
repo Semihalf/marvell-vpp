@@ -1,0 +1,29 @@
+From 1924df048caa3671db5ad3ae684d3e5e3150ccc2 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Fri, 16 Mar 2018 16:23:59 +0100
+Subject: [PATCH 57/74] net/mrvlna: remove comment on driver capability
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 3a263c8..b73623c 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -689,9 +689,9 @@ mrvlna_dev_infos_get(struct rte_eth_dev *dev __rte_unused,
+ 				DEV_RX_OFFLOAD_UDP_CKSUM |
+ 				DEV_RX_OFFLOAD_TCP_CKSUM;
+ 
+-//	info->tx_offload_capa = DEV_TX_OFFLOAD_IPV4_CKSUM |
+-//				DEV_TX_OFFLOAD_UDP_CKSUM |
+-//				DEV_TX_OFFLOAD_TCP_CKSUM;
++	info->tx_offload_capa = DEV_TX_OFFLOAD_IPV4_CKSUM |
++				DEV_TX_OFFLOAD_UDP_CKSUM |
++				DEV_TX_OFFLOAD_TCP_CKSUM;
+ 
+ 	/* By default packets are dropped if no descriptors are available */
+ 	info->default_rxconf.rx_drop_en = 1;
+-- 
+2.7.4
+

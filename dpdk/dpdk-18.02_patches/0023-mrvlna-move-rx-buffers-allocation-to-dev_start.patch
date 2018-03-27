@@ -1,0 +1,111 @@
+From 0c999fcb54579217fbc96c5a83abf1b3cc97f756 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 14:13:17 +0100
+Subject: [PATCH 23/74] mrvlna: move rx buffers allocation to dev_start
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 34 ++++++++++++++++++++--------------
+ 1 file changed, 20 insertions(+), 14 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 62bd6ff..f130319 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -104,6 +104,7 @@ struct neta_rxq {
+ 	int cksum_enabled;
+ 	uint64_t bytes_recv;
+ 	uint64_t drop_mac;
++	uint16_t requested_descs;
+ 	/* Virtual address of the RX DMA descriptors array */
+ 	struct neta_ppio_desc *descs;
+ 	/* DMA address of the RX DMA descriptors array */
+@@ -125,21 +126,24 @@ static int mrvlna_lcore_last;
+ 
+ 
+ static int
+-mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct rte_mbuf **mbufs, uint16_t desc)
++mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ {
++	struct rte_mbuf *mbufs[MRVL_NETA_TXD_MAX];
+ 	struct neta_buff_inf entries[MRVL_NETA_TXD_MAX];
++	uint16_t nb_desc;
+ 	int ret, i;
+ 
+-	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, desc);
++	nb_desc = rxq->requested_descs;
++	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, nb_desc);
+ 	if (ret)
+ 		RTE_LOG(ERR, PMD,
+-				"Failed to allocate %u mbufs.\n", desc);
++				"Failed to allocate %u mbufs.\n", nb_desc);
+ 
+-	for (i = 0; i < desc; i++) {
++	for (i = 0; i < nb_desc; i++) {
+ 		entries[i].addr = rte_mbuf_data_iova_default(mbufs[i]);
+ 		entries[i].cookie = (neta_cookie_t)(uint64_t)mbufs[i];
+ 	}
+-	ret = neta_ppio_inq_put_buffs(priv->ppio, rxq->queue_id, entries, &desc);
++	ret = neta_ppio_inq_put_buffs(priv->ppio, rxq->queue_id, entries, &nb_desc);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD,
+ 				"Failed to fill rx desc\n");
+@@ -377,10 +381,8 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+ 	struct neta_rxq *rxq;
+-	struct rte_mbuf *mbufs[MRVL_NETA_TXD_MAX];
+ 	uint32_t min_size,
+ 		 max_rx_pkt_len = dev->data->dev_conf.rxmode.max_rx_pkt_len;
+-	int ret;
+ 
+ 	min_size = rte_pktmbuf_data_room_size(mp) - RTE_PKTMBUF_HEADROOM -
+ 		   MRVLNA_PKT_EFFEC_OFFS;
+@@ -407,6 +409,7 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	rxq->cksum_enabled = dev->data->dev_conf.rxmode.hw_ip_checksum;
+ 	rxq->queue_id = idx;
+ 	rxq->port_id = dev->data->port_id;
++	rxq->requested_descs = desc; /* the number of descs to be allocated later */
+ 
+ //	if (priv->bpool_en == 1)
+ //		;//mrvlna_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
+@@ -415,12 +418,6 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
+ 		desc;
+ 
+-	ret = mrvlna_alloc_buffs(priv, rxq, mbufs, desc);
+-	if (ret) {
+-		rte_free(rxq);
+-		return ret;
+-	}
+-
+ 	dev->data->rx_queues[idx] = rxq;
+ 
+ 	return 0;
+@@ -530,7 +527,6 @@ static int
+ mrvlna_dev_start(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
+-
+ 	char match[MRVLNA_MATCH_LEN];
+ 	int ret = 0, i;
+ 
+@@ -544,6 +540,16 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 		return ret;
+ 	}
+ 
++	/* Allocate buffers */
++	for (i=0; i < dev->data->nb_rx_queues; i++) {
++		struct neta_rxq *rxq = dev->data->rx_queues[i];
++		ret = mrvlna_alloc_buffs(priv, rxq);
++		if (ret) {
++			rte_free(rxq);
++			return ret;
++		}
++	}
++
+ /* start tx queues */
+ 	for (i = 0; i < dev->data->nb_tx_queues; i++) {
+ 		struct neta_txq *txq = dev->data->tx_queues[i];
+-- 
+2.7.4
+

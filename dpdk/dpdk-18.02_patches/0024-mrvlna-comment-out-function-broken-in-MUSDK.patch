@@ -1,0 +1,53 @@
+From 383b49a2cfd1ae8c5cd6a63183a4e189a620285b Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 14:20:34 +0100
+Subject: [PATCH 24/74] mrvlna: comment out function broken in MUSDK
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index f130319..fd80c7c 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -632,18 +632,18 @@ mrvlna_priv_create(const char *dev_name)
+ {
+ 	char match[MRVLNA_MATCH_LEN];
+ 	struct neta_priv *priv;
+-	int ret;
++	/*int ret;*/
+ 
+ 	priv = rte_zmalloc_socket(dev_name, sizeof(*priv), 0, rte_socket_id());
+ 	if (!priv)
+ 		return NULL;
+-
+-	RTE_LOG(INFO, PMD, "Creating priv \n");
+-	ret = neta_netdev_get_port_info((char *)(uintptr_t)dev_name,
++/**
++ * TODO this function is broken in MUSDK
++ */
++	/*ret = neta_netdev_get_port_info((char *)(uintptr_t)dev_name,
+ 			&priv->ppio_id);
+ 	if (ret)
+-		goto out_free_priv;
+-	RTE_LOG(INFO, PMD, "Creating out priv\n");
++		goto out_free_priv;*/
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+ 
+@@ -652,9 +652,9 @@ mrvlna_priv_create(const char *dev_name)
+ 
+ 	return priv;
+ 
+-out_free_priv:
++/*out_free_priv:
+ 	rte_free(priv);
+-	return NULL;
++	return NULL;*/
+ }
+ 
+ /**
+-- 
+2.7.4
+

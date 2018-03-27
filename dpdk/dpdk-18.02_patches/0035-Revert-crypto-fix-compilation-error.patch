@@ -1,0 +1,34 @@
+From 5f060e34b92d69f49c8b0f30bc4b6023eab60627 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 5 Mar 2018 12:25:09 +0100
+Subject: [PATCH 35/74] Revert "crypto: fix compilation error"
+
+This reverts commit d7a0b4d0f3e668de64cbe9c5416f65cf1715b123.
+---
+ drivers/crypto/mrvl/rte_mrvl_pmd.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd.c b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+index ba023ec..e7aa6fe 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+@@ -43,8 +43,6 @@
+ #include "rte_mrvl_pmd_private.h"
+ 
+ #define MRVL_MUSDK_DMA_MEMSIZE 41943040
+-/** Maximum number of supported rings per crypto engines */
+-#define SAM_HW_RING_NUM			8
+ 
+ static uint8_t cryptodev_driver_id;
+ 
+@@ -816,7 +814,6 @@ cryptodev_mrvl_crypto_init(struct rte_vdev_device *vdev)
+ 	init_params.max_nb_sessions =
+ 		RTE_CRYPTODEV_PMD_DEFAULT_MAX_NB_SESSIONS;
+ 	init_params.socket_id = rte_socket_id();
+-	RTE_LOG(INFO, PMD, ">>>>> lcore count: %d sam_get cos tam %d HW_RING NUM %d\n", rte_lcore_count(), sam_get_num_inst(), SAM_HW_RING_NUM);
+ 
+ 	ret = rte_cryptodev_pmd_parse_input_args(&init_params, args);
+ 	if (ret) {
+-- 
+2.7.4
+

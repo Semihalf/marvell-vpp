@@ -1,0 +1,243 @@
+From ebd74842f1b2219226d876fc34f7f8a4a10a1e32 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 14 Feb 2018 17:13:29 +0100
+Subject: [PATCH 11/74] mrvlna: add dev_configure [intermediate]
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 134 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 109 insertions(+), 25 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 1aae437..f12cc8f 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -32,7 +32,6 @@
+  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-//#include <rte_ethdev.h>
+ #include <rte_ethdev_driver.h>
+ #include <rte_kvargs.h>
+ #include <rte_log.h>
+@@ -56,19 +55,18 @@
+ #define MRVL_IFACE_NAME_ARG "iface"
+ #define MRVL_CFG_ARG "cfg"
+ 
+-//TODO check all the defines and offsets!!
++//TODO 1 check all the defines and offsets!!
+ #define MRVL_MUSDK_DMA_MEMSIZE 41943040 // (40 * 1024 * 1024)
+-
++//TODO 1
+ #define MRVLNA_PKT_SIZE_MAX (10240 - MV_MH_SIZE)
+ #define MRVLNA_MAC_ADDRS_MAX 25
+ /** Maximum length of a match string */
+ #define MRVLNA_MATCH_LEN 16
+-
++//TODO 1
+ #define MRVLNA_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + MV_MH_SIZE)
+ 
+ static const char * const valid_args[] = {
+ 	MRVL_IFACE_NAME_ARG,
+-	MRVL_CFG_ARG,
+ 	NULL
+ };
+ 
+@@ -85,9 +83,6 @@ int mrvl_port_bpool_size[NETA_BPOOL_NUM_POOLS][RTE_MAX_LCORE];
+ 
+ /**
+  * Deinitialize packet processor.
+- *
+- * @return
+- *   0 on success, negative error value otherwise.
+  */
+ static void
+ mrvlna_deinit_neta(void)
+@@ -134,6 +129,45 @@ mrvlna_get_ifnames(const char *key __rte_unused, const char *value,
+ 
+ 	return 0;
+ }
++
++/**
++ * Configure TX Queues in a given port.
++ *
++ * Sets up TX queues egress scheduler and limiter.
++ *
++ * @param priv Port's private data
++ * @param portid DPDK port ID
++ * @param max_queues Maximum number of queues to configure.
++ * @returns 0 in case of success, negative value otherwise.
++ */
++static int
++mrvlna_configure_txqs(struct neta_priv *priv __rte_unused, uint16_t portid __rte_unused,
++		uint16_t max_queues)
++{
++	/* We need only a subset of configuration. */
++	//TODO skad wziac port_cfg??
++//	struct port_cfg *port_cfg = &mrvl_qos_cfg->port[portid];
++	int i;
++
++//	if (mrvl_qos_cfg == NULL)
++//		return 0;
++
++//	priv->ppio_params.rate_limit_enable = port_cfg->rate_limit_enable;
++//	if (port_cfg->rate_limit_enable)
++//		priv->ppio_params.rate_limit_params =
++//			port_cfg->rate_limit_params;
++
++	for (i = 0; i < max_queues; i++) {
++		struct neta_ppio_outq_params *params =
++			&priv->ppio_params.outqs_params.outqs_params[i];
++
++		params->size = 64;//port_cfg->outq[i].size;
++		params->weight = 1;//port_cfg->outq[i].weight;
++	}
++
++	return 0;
++}
++
+ /**
+  * DPDK callback for transmit.
+  *
+@@ -153,6 +187,19 @@ mrvlna_tx_pkt_burst(void *txq __rte_unused, struct rte_mbuf **tx_pkts __rte_unus
+ 	return 0;
+ }
+ 
++/**
++ * DPDK callback for receive.
++ *
++ * @param rxq
++ *   Generic pointer to the receive queue.
++ * @param rx_pkts
++ *   Array to store received packets.
++ * @param nb_pkts
++ *   Maximum number of packets in array.
++ *
++ * @return
++ *   Number of packets successfully received.
++ */
+ static uint16_t
+ mrvlna_rx_pkt_burst(void *rxq __rte_unused, struct rte_mbuf **rx_pkts __rte_unused, uint16_t nb_pkts __rte_unused)
+ {
+@@ -163,7 +210,7 @@ mrvlna_rx_pkt_burst(void *rxq __rte_unused, struct rte_mbuf **rx_pkts __rte_unus
+  * Ethernet device configuration.
+  *
+  * Prepare the driver for a given number of TX and RX queues and
+- * configure RSS.
++ * configure RSS if supported.
+  *
+  * @param dev
+  *   Pointer to Ethernet device structure.
+@@ -172,8 +219,60 @@ mrvlna_rx_pkt_burst(void *rxq __rte_unused, struct rte_mbuf **rx_pkts __rte_unus
+  *   0 on success, negative error value otherwise.
+  */
+ static int
+-mrvlna_dev_configure(struct rte_eth_dev *dev __rte_unused)
++mrvlna_dev_configure(struct rte_eth_dev *dev)
+ {
++	struct neta_priv *priv = dev->data->dev_private;
++	int ret;
++
++	if (dev->data->dev_conf.rxmode.mq_mode != ETH_MQ_RX_NONE) {
++		RTE_LOG(INFO, PMD, "Unsupported RSS and rx multi queue mode %d\n",
++			dev->data->dev_conf.rxmode.mq_mode);
++		return -EINVAL;
++	}
++
++	if (!dev->data->dev_conf.rxmode.hw_strip_crc) {
++		RTE_LOG(INFO, PMD,
++			"L2 CRC stripping is always enabled in hw\n");
++		dev->data->dev_conf.rxmode.hw_strip_crc = 1;
++	}
++
++	if (dev->data->dev_conf.rxmode.hw_vlan_strip) {
++		RTE_LOG(INFO, PMD, "VLAN stripping not supported\n");
++		return -EINVAL;
++	}
++
++	if (dev->data->dev_conf.rxmode.split_hdr_size) {
++		RTE_LOG(INFO, PMD, "Split headers not supported\n");
++		return -EINVAL;
++	}
++
++	if (dev->data->dev_conf.rxmode.enable_scatter) {
++		RTE_LOG(INFO, PMD, "RX Scatter/Gather not supported\n");
++		return -EINVAL;
++	}
++
++	if (dev->data->dev_conf.rxmode.enable_lro) {
++		RTE_LOG(INFO, PMD, "LRO not supported\n");
++		return -EINVAL;
++	}
++
++	if (dev->data->dev_conf.rxmode.jumbo_frame)
++		dev->data->mtu = dev->data->dev_conf.rxmode.max_rx_pkt_len -
++				 ETHER_HDR_LEN - ETHER_CRC_LEN;
++
++//	ret = mrvl_configure_rxqs(priv, dev->data->port_id,
++//				  dev->data->nb_rx_queues);
++//	if (ret < 0)
++//		return ret;
++
++	ret = mrvlna_configure_txqs(priv, dev->data->port_id,
++				  dev->data->nb_tx_queues);
++	if (ret < 0)
++		return ret;
++
++	priv->ppio_params.outqs_params.num_outqs = dev->data->nb_tx_queues;
++	priv->nb_rx_queues = dev->data->nb_rx_queues;
++
+ 	return 0;
+ }
+ 
+@@ -185,10 +284,6 @@ static const struct eth_dev_ops mrvlna_ops = {
+ //	.dev_set_link_down = ,
+ //	.dev_close = ,
+ //	.link_update = ,
+-//	.promiscuous_enable = ,
+-//	.allmulticast_enable = ,
+-//	.promiscuous_disable = ,
+-//	.allmulticast_disable = ,
+ //	.mac_addr_remove = ,
+ //	.mac_addr_add = ,
+ //	.mac_addr_set = ,
+@@ -199,20 +294,12 @@ static const struct eth_dev_ops mrvlna_ops = {
+ //	.dev_supported_ptypes_get = ,
+ //	.rxq_info_get = ,
+ //	.txq_info_get = ,
+-//	.vlan_filter_set = ,
+ //	.tx_queue_start = ,
+ //	.tx_queue_stop = ,
+ //	.rx_queue_setup = ,
+ //	.rx_queue_release = ,
+ //	.tx_queue_setup = ,
+ //	.tx_queue_release = ,
+-//	.flow_ctrl_get = ,
+-//	.flow_ctrl_set = ,
+-//	.rss_hash_update = ,
+-//	.rss_hash_conf_get = ,
+-//	.filter_ctrl = ,
+-//	.tm_ops_get = ,
+-//	.mtr_ops_get = ,
+ };
+ 
+ /**
+@@ -354,8 +441,6 @@ mrvlna_eth_dev_destroy(const char *name)
+ 	rte_eth_dev_release_port(eth_dev);
+ }
+ 
+-//TODO CHECK COMMENTS -> FUNCTION DESCRIPTIONS!!!!!
+-
+ /**
+  * DPDK callback to register the virtual device.
+  *
+@@ -390,7 +475,6 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
+ 			   mrvlna_get_ifnames, &ifnames);
+ 
+-
+ 	/*
+ 	 * The below system initialization should be done only once,
+ 	 * on the first provided configuration file
+-- 
+2.7.4
+

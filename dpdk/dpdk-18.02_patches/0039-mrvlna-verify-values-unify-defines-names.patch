@@ -1,0 +1,79 @@
+From 26c787d4df62f8b882e5bfbc58fbda62ba2d5206 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 6 Mar 2018 10:57:14 +0100
+Subject: [PATCH 39/74] mrvlna: verify values & unify defines names
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 14 +++++++-------
+ drivers/net/mrvlna/mrvlna_ethdev.h |  4 +---
+ 2 files changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 02389ce..3dc77fb 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -57,15 +57,15 @@
+ 
+ #define MRVLNA_COOKIE_ADDR_INVALID ~0ULL
+ 
+-//TODO 1 check all the defines and offsets!!
+-#define MRVL_MUSDK_DMA_MEMSIZE 41943040 // (40 * 1024 * 1024)
+-//TODO 1
++#define MRVLNA_MUSDK_DMA_MEMSIZE 41943040 /* (40 * 1024 * 1024) */
++
+ #define MRVLNA_PKT_SIZE_MAX (16382 - MV_MH_SIZE) /* 9700B */
++
+ #define MRVLNA_MAC_ADDRS_MAX 256 /*16 UC, 256 IP, 256 MC/BC */
+ /** Maximum length of a match string */
+ #define MRVLNA_MATCH_LEN 16
+-//TODO 1
+-#define MRVLNA_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + MV_MH_SIZE)
++
++#define MRVLNA_PKT_EFFEC_OFFS (MRVL_NETA_PKT_OFFS + MV_MH_SIZE)
+ 
+ uint64_t cookie_addr_high = MRVLNA_COOKIE_ADDR_INVALID;
+ 
+@@ -625,7 +625,7 @@ mrvlna_dev_configure(struct rte_eth_dev *dev)
+ 	 * Default: 1 TC, no QoS supported.
+ 	 */
+ 	priv->ppio_params.inqs_params.num_tcs = 1;
+-	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_PKT_OFFS;
++	priv->ppio_params.inqs_params.tcs_params[0].pkt_offset = MRVL_NETA_PKT_OFFS;
+ 
+ 	/* Disable hardware buffer management */
+ 	priv->ppio_params.inqs_params.hw_bm_en = 0;
+@@ -1195,7 +1195,7 @@ rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
+ 	 * ret == -EEXIST is correct, it means DMA
+ 	 * has been already initialized (by another PMD).
+ 	 */
+-	ret = mv_sys_dma_mem_init(MRVL_MUSDK_DMA_MEMSIZE);
++	ret = mv_sys_dma_mem_init(MRVLNA_MUSDK_DMA_MEMSIZE);
+ 	if (ret < 0) {
+ 		if (ret != -EEXIST)
+ 			goto out_free_kvlist;
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 4042479..bc2d3d3 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -49,9 +49,8 @@
+ #include <drivers/mv_neta_bpool.h>
+ #include <drivers/mv_neta_ppio.h>
+ 
+-//TODO check all the defines and offsets!!
+ /** Packet offset inside RX buffer. */
+-#define MRVL_PKT_OFFS 64
++#define MRVL_NETA_PKT_OFFS 64
+ 
+ /** Maximum number of rx/tx queues per port */
+ #define MRVL_NETA_RXQ_MAX 8
+@@ -63,7 +62,6 @@
+ 
+ /** Tx queue descriptors alignment in B */
+ #define MRVL_NETA_TXD_ALIGN 32
+-#define MVNETA_DESC_ALIGNED_SIZE	32
+ 
+ /** Minimum/maximum number of descriptors in rx queue TODO is it? */
+ #define MRVL_NETA_RXD_MIN 16
+-- 
+2.7.4
+

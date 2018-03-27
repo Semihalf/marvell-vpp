@@ -1,0 +1,25 @@
+From f0ed449d5b4f5077dbd4bcd21bc5baa87ca0ebc9 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Fri, 16 Mar 2018 13:50:13 +0100
+Subject: [PATCH 56/74] net/mrvlna: exclude FCS and MV HDR from pkt len
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index f0f93c8..3a263c8 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -478,7 +478,7 @@ mrvlna_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ 						 rte_pktmbuf_iova(mbuf));
+ 		neta_ppio_outq_desc_set_pkt_offset(&descs[i], 0);
+ 		neta_ppio_outq_desc_set_pkt_len(&descs[i],
+-					       rte_pktmbuf_pkt_len(mbuf));
++					       (rte_pktmbuf_pkt_len(mbuf) - (ETH_FCS_LEN + MV_MH_SIZE)));
+ 
+ 		bytes_sent += rte_pktmbuf_pkt_len(mbuf);
+ 
+-- 
+2.7.4
+

@@ -1,0 +1,28 @@
+From 8cafb15657d043edbde0285b06f30dba63a0ae0f Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 15 Mar 2018 09:26:44 +0100
+Subject: [PATCH 51/74] net/mrvlna: fix tx offset and pkt len
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index a79a1ec..d4c342b 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -480,9 +480,9 @@ mrvlna_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ 		neta_ppio_outq_desc_reset(&descs[i]);
+ 		neta_ppio_outq_desc_set_phys_addr(&descs[i],
+ 						 rte_pktmbuf_iova(mbuf));
+-		neta_ppio_outq_desc_set_pkt_offset(&descs[i], MRVLNA_PKT_EFFEC_OFFS);
++		neta_ppio_outq_desc_set_pkt_offset(&descs[i], 0);
+ 		neta_ppio_outq_desc_set_pkt_len(&descs[i],
+-					       rte_pktmbuf_pkt_len(mbuf) - (ETH_FCS_LEN + MV_MH_SIZE));
++					       rte_pktmbuf_pkt_len(mbuf));
+ 
+ 		bytes_sent += rte_pktmbuf_pkt_len(mbuf);
+ 
+-- 
+2.7.4
+
