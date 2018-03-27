@@ -1,0 +1,25 @@
+From cf3c11228807a2562d503afbd52d6b3cf41fa616 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Sun, 18 Mar 2018 16:24:28 +0100
+Subject: [PATCH 61/74] net/mrvlna: remove unused rxq struct field
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 1b2fb1b..2ed10ca 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -114,8 +114,6 @@ struct neta_rxq {
+ 	uint64_t bytes_recv;
+ 	uint64_t drop_mac;
+ 	uint64_t pkts_processed;
+-	/* Virtual address of the RX DMA descriptors array */
+-	struct neta_ppio_desc *descs;
+ };
+ 
+ 
+-- 
+2.7.4
+

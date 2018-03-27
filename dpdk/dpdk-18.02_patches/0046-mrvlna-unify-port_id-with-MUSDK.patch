@@ -1,0 +1,59 @@
+From 5ba060971f69a310e13cef8320c462f5853c114d Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 12 Mar 2018 15:26:35 +0100
+Subject: [PATCH 46/74] mrvlna: unify port_id with MUSDK
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 68eca9f..2aa3abe 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -954,7 +954,6 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	char match[MRVLNA_MATCH_LEN];
+ 	int ret = 0, i;
+ 
+-	priv->ppio_id = dev->data->port_id;
+ 	snprintf(match, sizeof(match), "eth%d", priv->ppio_id);
+ 	priv->ppio_params.match = match;
+ 	priv->ppio_params.inqs_params.mtu = 1500;
+@@ -964,6 +963,7 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 		RTE_LOG(ERR, PMD, "Failed to init ppio\n");
+ 		return ret;
+ 	}
++	priv->ppio_id = priv->ppio->port_id;
+ 
+ 	/* Allocate buffers */
+ 	for (i=0; i < dev->data->nb_rx_queues; i++) {
+@@ -1164,26 +1164,14 @@ mrvlna_priv_create(const char *dev_name)
+ {
+ 	char match[MRVLNA_MATCH_LEN];
+ 	struct neta_priv *priv;
+-	/*int ret;*/
+ 
+ 	priv = rte_zmalloc_socket(dev_name, sizeof(*priv), 0, rte_socket_id());
+ 	if (!priv)
+ 		return NULL;
+-/**
+- * TODO this function is broken in MUSDK
+- */
+-	/*ret = neta_netdev_get_port_info((char *)(uintptr_t)dev_name,
+-			&priv->ppio_id);
+-	if (ret)
+-		goto out_free_priv;*/
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+ 
+ 	return priv;
+-
+-/*out_free_priv:
+-	rte_free(priv);
+-	return NULL;*/
+ }
+ 
+ /**
+-- 
+2.7.4
+

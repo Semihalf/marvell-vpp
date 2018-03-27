@@ -1,0 +1,87 @@
+From 92edd357f1fe9abf99efcfe5eb9071e74061595a Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 21:07:53 +0100
+Subject: [PATCH 27/74] mrvlna: add rxq flush in dev_stop
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 39 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 32 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index db4fd61..47697a5 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -169,19 +169,18 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+  * Return mbufs to mempool.
+  */
+ static void
+-mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
++mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq, struct neta_ppio_desc *desc)
+ {
+ 	uint64_t addr;
+ 	uint8_t i;
+ 	uint64_t size = priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size;
+ 
+-	// TODO this should be done by using mvneta API somehow
+ 	for (i = 0; i < size; i++) {
+-		if (rxq->descs) {
+-			addr = /*cookie_addr_high | */rxq->descs->cmds[4];
++		if (desc) {
++			addr = neta_ppio_inq_desc_get_cookie(desc);
+ 			if (addr)
+ 				rte_pktmbuf_free((struct rte_mbuf *)addr);
+-			rxq->descs++;
++			desc++;
+ 		}
+ 	}
+ 
+@@ -189,6 +188,28 @@ mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ }
+ 
+ /**
++ * Flush receive single queue.
++ *
++ * @param rxq
++ *   Pointer to rx queue structure.
++ * @param descs
++ *   Array of rx descriptors
++ */
++
++static void
++mrvlna_flush_rx_queue(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
++{
++	int ret, num;
++
++	do {
++		num = MRVL_NETA_RXD_MAX;
++		ret = neta_ppio_recv(rxq->priv->ppio,
++					rxq->queue_id,
++					descs, (uint16_t *)&num);
++	} while (ret == 0 && num);
++}
++
++/**
+  * Deinitialize packet processor.
+  */
+ static void
+@@ -618,11 +639,15 @@ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ 	struct neta_priv *priv = dev->data->dev_private;
+ 	int i;
+ 
+-	//TODO flush rx/tx queues
++	//TODO flush tx queues
++
++	RTE_LOG(INFO, PMD, "Flushing rx queues\n");
+ 	for (i = 0; i < dev->data->nb_rx_queues; i++) {
+ 		struct neta_rxq *rxq = dev->data->rx_queues[i];
++		struct neta_ppio_desc descs[MRVL_NETA_RXD_MAX];
+ 
+-		mrvlna_free_buffs(priv, rxq);
++		mrvlna_flush_rx_queue(rxq, descs);
++		mrvlna_free_buffs(priv, rxq, descs);
+ 	}
+ 
+ 	neta_ppio_deinit(priv->ppio);
+-- 
+2.7.4
+

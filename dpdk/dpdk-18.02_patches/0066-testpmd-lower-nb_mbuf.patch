@@ -1,0 +1,24 @@
+From bcb6678a4532aa7604169b7acd83cb64a1db17e9 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 20 Mar 2018 10:27:22 +0100
+Subject: [PATCH 66/74] testpmd: lower nb_mbuf
+
+---
+ app/test-pmd/testpmd.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/app/test-pmd/testpmd.c b/app/test-pmd/testpmd.c
+index 4c0e258..3d404fa 100644
+--- a/app/test-pmd/testpmd.c
++++ b/app/test-pmd/testpmd.c
+@@ -495,6 +495,7 @@ mbuf_pool_create(uint16_t mbuf_seg_size, unsigned nb_mbuf,
+ 	mb_size = sizeof(struct rte_mbuf) + mbuf_seg_size;
+ 	mbuf_poolname_build(socket_id, pool_name, sizeof(pool_name));
+ 
++	nb_mbuf = 8192;
+ 	TESTPMD_LOG(INFO,
+ 		"create a new mbuf pool <%s>: n=%u, size=%u, socket=%u\n",
+ 		pool_name, nb_mbuf, mbuf_seg_size, socket_id);
+-- 
+2.7.4
+

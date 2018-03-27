@@ -1,0 +1,265 @@
+From c23d342afa2b2dc5647dc81dec70322a9e1bf092 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Wed, 14 Feb 2018 12:21:44 +0100
+Subject: [PATCH 09/74] mrvlna: add mrvl neta pmd driver
+
+---
+ config/common_base                            |  5 ++
+ doc/guides/nics/mrvl.rst                      |  4 ++
+ drivers/net/Makefile                          |  1 +
+ drivers/net/mrvlna/Makefile                   | 68 +++++++++++++++++++++++++++
+ drivers/net/mrvlna/mrvlna_ethdev.c            | 52 ++++++++++++++++++++
+ drivers/net/mrvlna/mrvlna_ethdev.h            | 40 ++++++++++++++++
+ drivers/net/mrvlna/rte_pmd_mrvlna_version.map |  3 ++
+ mk/rte.app.mk                                 |  1 +
+ 8 files changed, 174 insertions(+)
+ create mode 100644 drivers/net/mrvlna/Makefile
+ create mode 100644 drivers/net/mrvlna/mrvlna_ethdev.c
+ create mode 100644 drivers/net/mrvlna/mrvlna_ethdev.h
+ create mode 100644 drivers/net/mrvlna/rte_pmd_mrvlna_version.map
+
+diff --git a/config/common_base b/config/common_base
+index ad03cf4..52553ed 100644
+--- a/config/common_base
++++ b/config/common_base
+@@ -385,6 +385,11 @@ CONFIG_RTE_LIBRTE_PMD_FAILSAFE=y
+ CONFIG_RTE_LIBRTE_MRVL_PMD=n
+ 
+ #
++# Compile Marvell NETA PMD driver
++#
++CONFIG_RTE_LIBRTE_MRVLNA_PMD=n
++
++#
+ # Compile virtual device driver for NetVSC on Hyper-V/Azure
+ #
+ CONFIG_RTE_LIBRTE_VDEV_NETVSC_PMD=n
+diff --git a/doc/guides/nics/mrvl.rst b/doc/guides/nics/mrvl.rst
+index b7f3292..22ecfd5 100644
+--- a/doc/guides/nics/mrvl.rst
++++ b/doc/guides/nics/mrvl.rst
+@@ -133,6 +133,10 @@ The following options can be modified in the ``config`` file.
+ - ``CONFIG_RTE_LIBRTE_MRVL_PMD`` (default ``n``)
+ 
+     Toggle compilation of the librte_pmd_mrvl driver.
++   
++- ``CONFIG_RTE_LIBRTE_MRVLNA_PMD`` (default ``n``)
++
++    Toggle compilation of the librte_pmd_mrvlna driver.
+ 
+ 
+ QoS Configuration
+diff --git a/drivers/net/Makefile b/drivers/net/Makefile
+index e112732..1fa8264 100644
+--- a/drivers/net/Makefile
++++ b/drivers/net/Makefile
+@@ -28,6 +28,7 @@ DIRS-$(CONFIG_RTE_LIBRTE_LIO_PMD) += liquidio
+ DIRS-$(CONFIG_RTE_LIBRTE_MLX4_PMD) += mlx4
+ DIRS-$(CONFIG_RTE_LIBRTE_MLX5_PMD) += mlx5
+ DIRS-$(CONFIG_RTE_LIBRTE_MRVL_PMD) += mrvl
++DIRS-$(CONFIG_RTE_LIBRTE_MRVLNA_PMD) += mrvlna
+ DIRS-$(CONFIG_RTE_LIBRTE_NFP_PMD) += nfp
+ DIRS-$(CONFIG_RTE_LIBRTE_BNXT_PMD) += bnxt
+ DIRS-$(CONFIG_RTE_LIBRTE_PMD_NULL) += null
+diff --git a/drivers/net/mrvlna/Makefile b/drivers/net/mrvlna/Makefile
+new file mode 100644
+index 0000000..8980268
+--- /dev/null
++++ b/drivers/net/mrvlna/Makefile
+@@ -0,0 +1,68 @@
++#   BSD LICENSE
++#
++#   Copyright(c) 2017 Marvell International Ltd.
++#   Copyright(c) 2017 Semihalf.
++#   All rights reserved.
++#
++#   Redistribution and use in source and binary forms, with or without
++#   modification, are permitted provided that the following conditions
++#   are met:
++#
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in
++#       the documentation and/or other materials provided with the
++#       distribution.
++#     * Neither the name of the copyright holder nor the names of its
++#       contributors may be used to endorse or promote products derived
++#       from this software without specific prior written permission.
++#
++#   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++#   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++#   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++#   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++#   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++#   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++#   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++#   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++#   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++include $(RTE_SDK)/mk/rte.vars.mk
++
++ifneq ($(MAKECMDGOALS),clean)
++ifneq ($(MAKECMDGOALS),config)
++ifeq ($(LIBMUSDK_PATH),)
++$(error "Please define LIBMUSDK_PATH environment variable")
++endif
++endif
++endif
++
++# library name
++LIB = librte_pmd_mrvlna.a
++
++# library version
++LIBABIVER := 1
++
++# versioning export map
++EXPORT_MAP := rte_pmd_mrvlna_version.map
++
++# external library dependencies
++CFLAGS += -I$(LIBMUSDK_PATH)/include
++CFLAGS += -DMVCONF_TYPES_PUBLIC
++CFLAGS += -DMVCONF_DMA_PHYS_ADDR_T_PUBLIC
++CFLAGS += -DMVCONF_PP2_BPOOL_COOKIE_SIZE=32 -DMVCONF_PP2_BPOOL_DMA_ADDR_SIZE=64 -DMVCONF_DMA_PHYS_ADDR_T_SIZE=64
++CFLAGS += $(WERROR_FLAGS)
++CFLAGS += -O3
++LDLIBS += -L$(LIBMUSDK_PATH)/lib
++LDLIBS += -lmusdk
++LDLIBS += -lrte_eal -lrte_mbuf -lrte_mempool -lrte_ring
++LDLIBS += -lrte_ethdev -lrte_net -lrte_kvargs -lrte_cfgfile
++LDLIBS += -lrte_bus_vdev
++
++# library source files
++SRCS-$(CONFIG_RTE_LIBRTE_MRVLNA_PMD) += mrvlna_ethdev.c
++
++include $(RTE_SDK)/mk/rte.lib.mk
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+new file mode 100644
+index 0000000..99bd0f4
+--- /dev/null
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -0,0 +1,52 @@
++/*-
++ *   BSD LICENSE
++ *
++ *   Copyright(c) 2017 Marvell International Ltd.
++ *   Copyright(c) 2017 Semihalf.
++ *   All rights reserved.
++ *
++ *   Redistribution and use in source and binary forms, with or without
++ *   modification, are permitted provided that the following conditions
++ *   are met:
++ *
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in
++ *       the documentation and/or other materials provided with the
++ *       distribution.
++ *     * Neither the name of Semihalf nor the names of its
++ *       contributors may be used to endorse or promote products derived
++ *       from this software without specific prior written permission.
++ *
++ *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <rte_ethdev.h>
++#include <rte_kvargs.h>
++#include <rte_log.h>
++#include <rte_malloc.h>
++#include <rte_bus_vdev.h>
++
++
++#include <fcntl.h>
++#include <linux/ethtool.h>
++#include <linux/sockios.h>
++#include <net/if.h>
++#include <net/if_arp.h>
++#include <sys/ioctl.h>
++#include <sys/socket.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++
++#include "mrvlna_ethdev.h"
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+new file mode 100644
+index 0000000..3380ebf
+--- /dev/null
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -0,0 +1,40 @@
++/*-
++ *   BSD LICENSE
++ *
++ *   Copyright(c) 2017 Marvell International Ltd.
++ *   Copyright(c) 2017 Semihalf.
++ *   All rights reserved.
++ *
++ *   Redistribution and use in source and binary forms, with or without
++ *   modification, are permitted provided that the following conditions
++ *   are met:
++ *
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above copyright
++ *       notice, this list of conditions and the following disclaimer in
++ *       the documentation and/or other materials provided with the
++ *       distribution.
++ *     * Neither the name of the copyright holder nor the names of its
++ *       contributors may be used to endorse or promote products derived
++ *       from this software without specific prior written permission.
++ *
++ *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *   OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#ifndef _MRVL_ETHDEV_H_
++#define _MRVL_ETHDEV_H_
++
++
++
++#endif /* _MRVL_ETHDEV_H_ */
+diff --git a/drivers/net/mrvlna/rte_pmd_mrvlna_version.map b/drivers/net/mrvlna/rte_pmd_mrvlna_version.map
+new file mode 100644
+index 0000000..a753031
+--- /dev/null
++++ b/drivers/net/mrvlna/rte_pmd_mrvlna_version.map
+@@ -0,0 +1,3 @@
++DPDK_17.11 {
++	local: *;
++};
+diff --git a/mk/rte.app.mk b/mk/rte.app.mk
+index 3eb41d1..a9e7b5b 100644
+--- a/mk/rte.app.mk
++++ b/mk/rte.app.mk
+@@ -155,6 +155,7 @@ else
+ _LDLIBS-$(CONFIG_RTE_LIBRTE_MLX5_PMD)       += -lrte_pmd_mlx5 -libverbs -lmlx5
+ endif
+ _LDLIBS-$(CONFIG_RTE_LIBRTE_MRVL_PMD)       += -lrte_pmd_mrvl -L$(LIBMUSDK_PATH)/lib -lmusdk
++_LDLIBS-$(CONFIG_RTE_LIBRTE_MRVLNA_PMD)     += -lrte_pmd_mrvlna -L$(LIBMUSDK_PATH)/lib -lmusdk
+ _LDLIBS-$(CONFIG_RTE_LIBRTE_NFP_PMD)        += -lrte_pmd_nfp
+ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_NULL)       += -lrte_pmd_null
+ _LDLIBS-$(CONFIG_RTE_LIBRTE_PMD_PCAP)       += -lrte_pmd_pcap -lpcap
+-- 
+2.7.4
+

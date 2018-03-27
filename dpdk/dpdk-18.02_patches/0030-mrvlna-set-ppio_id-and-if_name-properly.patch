@@ -1,0 +1,56 @@
+From 8937a141e881c38fa64d7b00b7edd45064e6dc12 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 1 Mar 2018 11:03:32 +0100
+Subject: [PATCH 30/74] mrvlna: set ppio_id and if_name properly
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index fe9d4d1..d0cf4d2 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -38,7 +38,7 @@
+ #include <rte_malloc.h>
+ #include <rte_bus_vdev.h>
+ 
+-
++#include <stdio.h>
+ #include <fcntl.h>
+ #include <linux/ethtool.h>
+ #include <linux/sockios.h>
+@@ -565,10 +565,12 @@ mrvlna_dev_start(struct rte_eth_dev *dev)
+ 	char match[MRVLNA_MATCH_LEN];
+ 	int ret = 0, i;
+ 
+-	snprintf(match, sizeof(match), "neta-%d:%d",
+-		 priv->pp_id, priv->ppio_id);
++	snprintf(match, sizeof(match), "neta-%d", priv->ppio_id);
+ 	priv->ppio_params.match = match;
+ 
++	snprintf(priv->ppio_params.if_name, sizeof(priv->ppio_params.if_name), "%s", dev->data->name);
++	priv->ppio_id = dev->data->port_id;
++
+ 	ret = neta_ppio_init(&priv->ppio_params, &priv->ppio);
+ 	if (ret) {
+ 		RTE_LOG(ERR, PMD, "Failed to init ppio\n");
+@@ -764,7 +766,6 @@ mrvlna_priv_create(const char *dev_name)
+ 		goto out_free_priv;*/
+ 
+ 	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
+-
+ //	priv->ppio_params.type = PP2_PPIO_T_NIC;
+ //	rte_spinlock_init(&priv->lock);
+ 
+@@ -797,6 +798,7 @@ mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
+ 		return -ENOMEM;
+ 
+ 	priv = mrvlna_priv_create(name);
++
+ 	if (!priv) {
+ 		ret = -ENOMEM;
+ 		goto out_free_dev;
+-- 
+2.7.4
+

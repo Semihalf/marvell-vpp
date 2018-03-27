@@ -1,0 +1,33 @@
+From f16e1d31157a4485c20a7a7f324360a83273c3bb Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 20 Mar 2018 16:19:37 +0100
+Subject: [PATCH 68/74] net/mvneta: fix mbuf pkt len
+
+---
+ drivers/net/mvneta/mvneta_ethdev.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mvneta/mvneta_ethdev.c b/drivers/net/mvneta/mvneta_ethdev.c
+index a25e155..7a8997f 100644
+--- a/drivers/net/mvneta/mvneta_ethdev.c
++++ b/drivers/net/mvneta/mvneta_ethdev.c
+@@ -477,7 +477,7 @@ mvneta_tx_pkt_burst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+ 						 rte_pktmbuf_iova(mbuf));
+ 		neta_ppio_outq_desc_set_pkt_offset(&descs[i], 0);
+ 		neta_ppio_outq_desc_set_pkt_len(&descs[i],
+-					       (rte_pktmbuf_pkt_len(mbuf) - (ETH_FCS_LEN + MV_MH_SIZE)));
++					       (rte_pktmbuf_pkt_len(mbuf)));
+ 
+ 		bytes_sent += rte_pktmbuf_pkt_len(mbuf);
+ 
+@@ -560,6 +560,7 @@ mvneta_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+ 
+ 		mbuf->data_off += MVNETA_PKT_EFFEC_OFFS;
+ 		mbuf->pkt_len = neta_ppio_inq_desc_get_pkt_len(&descs[i]);
++		mbuf->pkt_len -= (ETH_FCS_LEN + MV_MH_SIZE);
+ 		mbuf->data_len = mbuf->pkt_len;
+ 		mbuf->port = q->port_id;
+ 		mbuf->packet_type =
+-- 
+2.7.4
+

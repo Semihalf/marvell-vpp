@@ -1,0 +1,532 @@
+From 35ea9bab369f39cf04153caae40fff8dbd03b16a Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 13 Feb 2018 16:24:45 +0100
+Subject: [PATCH 10/74] mrvlna: add probe, remove, eth_dev_create
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 447 ++++++++++++++++++++++++++++++++++++-
+ drivers/net/mrvlna/mrvlna_ethdev.h |  46 ++++
+ 2 files changed, 492 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 99bd0f4..1aae437 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -32,7 +32,8 @@
+  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#include <rte_ethdev.h>
++//#include <rte_ethdev.h>
++#include <rte_ethdev_driver.h>
+ #include <rte_kvargs.h>
+ #include <rte_log.h>
+ #include <rte_malloc.h>
+@@ -50,3 +51,447 @@
+ #include <sys/types.h>
+ 
+ #include "mrvlna_ethdev.h"
++
++
++#define MRVL_IFACE_NAME_ARG "iface"
++#define MRVL_CFG_ARG "cfg"
++
++//TODO check all the defines and offsets!!
++#define MRVL_MUSDK_DMA_MEMSIZE 41943040 // (40 * 1024 * 1024)
++
++#define MRVLNA_PKT_SIZE_MAX (10240 - MV_MH_SIZE)
++#define MRVLNA_MAC_ADDRS_MAX 25
++/** Maximum length of a match string */
++#define MRVLNA_MATCH_LEN 16
++
++#define MRVLNA_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + MV_MH_SIZE)
++
++static const char * const valid_args[] = {
++	MRVL_IFACE_NAME_ARG,
++	MRVL_CFG_ARG,
++	NULL
++};
++
++struct mrvlna_ifnames {
++//	const char *names[PP2_NUM_ETH_PPIO * PP2_NUM_PKT_PROC]; //PP2_NUM_PKT_PROC = 2 (u nas 1 PP prawdopodobnie, PP2_NUM_ETH_PPIO = 3 (3 instancje, u nas 4)
++	const char *names[NETA_NUM_ETH_PPIO];
++	int idx;
++};
++
++static int mrvlna_dev_num;
++static int mrvlna_lcore_first;
++static int mrvlna_lcore_last;
++int mrvl_port_bpool_size[NETA_BPOOL_NUM_POOLS][RTE_MAX_LCORE];
++
++/**
++ * Deinitialize packet processor.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static void
++mrvlna_deinit_neta(void)
++{
++	neta_deinit();
++}
++/**
++ * Initialize packet processor.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_init_neta(void)
++{
++	struct neta_init_params init_params;
++
++	memset(&init_params, 0, sizeof(init_params));
++
++	return neta_init(&init_params);
++}
++
++/**
++ * Callback used by rte_kvargs_process() during argument parsing.
++ *
++ * @param key
++ *   Pointer to the parsed key (unused).
++ * @param value
++ *   Pointer to the parsed value.
++ * @param extra_args
++ *   Pointer to the extra arguments which contains address of the
++ *   table of pointers to parsed interface names.
++ *
++ * @return
++ *   Always 0.
++ */
++static int
++mrvlna_get_ifnames(const char *key __rte_unused, const char *value,
++		 void *extra_args)
++{
++	struct mrvlna_ifnames *ifnames = extra_args;
++
++	ifnames->names[ifnames->idx++] = value;
++
++	return 0;
++}
++/**
++ * DPDK callback for transmit.
++ *
++ * @param txq
++ *   Generic pointer transmit queue.
++ * @param tx_pkts
++ *   Packets to transmit.
++ * @param nb_pkts
++ *   Number of packets in array.
++ *
++ * @return
++ *   Number of packets successfully transmitted.
++ */
++static uint16_t
++mrvlna_tx_pkt_burst(void *txq __rte_unused, struct rte_mbuf **tx_pkts __rte_unused, uint16_t nb_pkts __rte_unused)
++{
++	return 0;
++}
++
++static uint16_t
++mrvlna_rx_pkt_burst(void *rxq __rte_unused, struct rte_mbuf **rx_pkts __rte_unused, uint16_t nb_pkts __rte_unused)
++{
++	return 0;
++}
++
++/**
++ * Ethernet device configuration.
++ *
++ * Prepare the driver for a given number of TX and RX queues and
++ * configure RSS.
++ *
++ * @param dev
++ *   Pointer to Ethernet device structure.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_dev_configure(struct rte_eth_dev *dev __rte_unused)
++{
++	return 0;
++}
++
++static const struct eth_dev_ops mrvlna_ops = {
++	.dev_configure = mrvlna_dev_configure,
++//	.dev_start = ,
++//	.dev_stop = ,
++//	.dev_set_link_up = ,
++//	.dev_set_link_down = ,
++//	.dev_close = ,
++//	.link_update = ,
++//	.promiscuous_enable = ,
++//	.allmulticast_enable = ,
++//	.promiscuous_disable = ,
++//	.allmulticast_disable = ,
++//	.mac_addr_remove = ,
++//	.mac_addr_add = ,
++//	.mac_addr_set = ,
++//	.mtu_set = ,
++//	.stats_get = ,
++//	.stats_reset = ,
++//	.dev_infos_get = ,
++//	.dev_supported_ptypes_get = ,
++//	.rxq_info_get = ,
++//	.txq_info_get = ,
++//	.vlan_filter_set = ,
++//	.tx_queue_start = ,
++//	.tx_queue_stop = ,
++//	.rx_queue_setup = ,
++//	.rx_queue_release = ,
++//	.tx_queue_setup = ,
++//	.tx_queue_release = ,
++//	.flow_ctrl_get = ,
++//	.flow_ctrl_set = ,
++//	.rss_hash_update = ,
++//	.rss_hash_conf_get = ,
++//	.filter_ctrl = ,
++//	.tm_ops_get = ,
++//	.mtr_ops_get = ,
++};
++
++/**
++ * Create private device structure.
++ *
++ * @param dev_name
++ *   Pointer to the port name passed in the initialization parameters.
++ *
++ * @return
++ *   Pointer to the newly allocated private device structure.
++ */
++static struct neta_priv *
++mrvlna_priv_create(const char *dev_name)
++{
++	struct neta_bpool_params bpool_params;
++	char match[MRVLNA_MATCH_LEN];
++	struct neta_priv *priv;
++	int ret;// bpool_bit;
++
++	priv = rte_zmalloc_socket(dev_name, sizeof(*priv), 0, rte_socket_id());
++	if (!priv)
++		return NULL;
++
++//	ret = pp2_netdev_get_ppio_info((char *)(uintptr_t)dev_name,
++//				       &priv->pp_id, &priv->ppio_id);
++//	if (ret)
++//		goto out_free_priv;
++
++//	bpool_bit = mrvl_reserve_bit(&used_bpools[priv->pp_id],
++//				     PP2_BPOOL_NUM_POOLS);
++//	if (bpool_bit < 0)
++//		goto out_free_priv;
++//	priv->bpool_bit = bpool_bit;
++
++	snprintf(match, sizeof(match), "pool-%d", priv->pp_id);
++	memset(&bpool_params, 0, sizeof(bpool_params));
++	bpool_params.match = match;
++	bpool_params.buff_len = MRVLNA_PKT_SIZE_MAX + MRVLNA_PKT_EFFEC_OFFS;
++	ret = neta_bpool_init(&bpool_params, &priv->bpool);
++	if (ret) {
++		RTE_LOG(ERR, PMD, "Failed to init bpool!\n");
++	//	goto out_clear_bpool_bit;
++		goto out_free_priv;
++	}
++
++//	priv->ppio_params.type = PP2_PPIO_T_NIC;
++//	rte_spinlock_init(&priv->lock);
++
++	return priv;
++//out_clear_bpool_bit:
++//	used_bpools[priv->pp_id] &= ~(1 << priv->bpool_bit);
++out_free_priv:
++	rte_free(priv);
++	return NULL;
++}
++
++/**
++ * Create device representing Ethernet port.
++ *
++ * @param name
++ *   Pointer to the port's name.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++mrvlna_eth_dev_create(struct rte_vdev_device *vdev, const char *name)
++{
++	int ret, fd = socket(AF_INET, SOCK_DGRAM, 0);
++	struct rte_eth_dev *eth_dev;
++	struct neta_priv *priv;
++	struct ifreq req;
++
++	eth_dev = rte_eth_dev_allocate(name);
++	if (!eth_dev)
++		return -ENOMEM;
++
++	priv = mrvlna_priv_create(name);
++	if (!priv) {
++		ret = -ENOMEM;
++		goto out_free_dev;
++	}
++
++	eth_dev->data->mac_addrs =
++		rte_zmalloc("mac_addrs",
++			    ETHER_ADDR_LEN * MRVLNA_MAC_ADDRS_MAX, 0);
++	if (!eth_dev->data->mac_addrs) {
++		RTE_LOG(ERR, PMD, "Failed to allocate space for eth addrs\n");
++		ret = -ENOMEM;
++		goto out_free_priv;
++	}
++
++	memset(&req, 0, sizeof(req));
++	strcpy(req.ifr_name, name);
++	ret = ioctl(fd, SIOCGIFHWADDR, &req);
++	if (ret)
++		goto out_free_mac;
++
++	memcpy(eth_dev->data->mac_addrs[0].addr_bytes,
++	       req.ifr_addr.sa_data, ETHER_ADDR_LEN);
++
++	eth_dev->rx_pkt_burst = mrvlna_rx_pkt_burst;
++	eth_dev->tx_pkt_burst = mrvlna_tx_pkt_burst;
++	eth_dev->data->kdrv = RTE_KDRV_NONE;
++	eth_dev->data->dev_private = priv;
++	eth_dev->device = &vdev->device;
++	eth_dev->dev_ops = &mrvlna_ops;
++
++	return 0;
++out_free_mac:
++	rte_free(eth_dev->data->mac_addrs);
++out_free_dev:
++	rte_eth_dev_release_port(eth_dev);
++out_free_priv:
++	rte_free(priv);
++
++	return ret;
++}
++
++/**
++ * Cleanup previously created device representing Ethernet port.
++ *
++ * @param name
++ *   Pointer to the port name.
++ */
++static void
++mrvlna_eth_dev_destroy(const char *name)
++{
++	struct rte_eth_dev *eth_dev;
++	struct neta_priv *priv;
++
++	eth_dev = rte_eth_dev_allocated(name);
++	if (!eth_dev)
++		return;
++
++	priv = eth_dev->data->dev_private;
++	rte_free(priv);
++	rte_free(eth_dev->data->mac_addrs);
++	rte_eth_dev_release_port(eth_dev);
++}
++
++//TODO CHECK COMMENTS -> FUNCTION DESCRIPTIONS!!!!!
++
++/**
++ * DPDK callback to register the virtual device.
++ *
++ * @param vdev
++ *   Pointer to the virtual device.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++rte_pmd_mrvlna_probe(struct rte_vdev_device *vdev)
++{
++	struct rte_kvargs *kvlist;
++	struct mrvlna_ifnames ifnames;
++	int ret = -EINVAL;
++	uint32_t i, ifnum;
++	const char *params;
++
++	params = rte_vdev_device_args(vdev);
++	if (!params)
++		return -EINVAL;
++
++	kvlist = rte_kvargs_parse(params, valid_args);
++	if (!kvlist)
++		return -EINVAL;
++
++	ifnum = rte_kvargs_count(kvlist, MRVL_IFACE_NAME_ARG);
++	if (ifnum > RTE_DIM(ifnames.names))
++		goto out_free_kvlist;
++
++	ifnames.idx = 0;
++	rte_kvargs_process(kvlist, MRVL_IFACE_NAME_ARG,
++			   mrvlna_get_ifnames, &ifnames);
++
++
++	/*
++	 * The below system initialization should be done only once,
++	 * on the first provided configuration file
++	 */
++	if (mrvlna_dev_num)
++		goto init_devices;
++
++	RTE_LOG(INFO, PMD, "Perform MUSDK initializations\n");
++	/*
++	 * ret == -EEXIST is correct, it means DMA
++	 * has been already initialized (by another PMD).
++	 */
++	ret = mv_sys_dma_mem_init(MRVL_MUSDK_DMA_MEMSIZE);
++	if (ret < 0) {
++		if (ret != -EEXIST)
++			goto out_free_kvlist;
++		else
++			RTE_LOG(INFO, PMD,
++					"DMA memory has been already initialized by a different driver.\n");
++	}
++
++	ret = mrvlna_init_neta();
++	if (ret) {
++		RTE_LOG(ERR, PMD, "Failed to init NETA!\n");
++		goto out_deinit_dma;
++	}
++
++	memset(mrvl_port_bpool_size, 0, sizeof(mrvl_port_bpool_size));
++
++	mrvlna_lcore_first = RTE_MAX_LCORE;
++	mrvlna_lcore_last = 0;
++
++init_devices:
++	for (i = 0; i < ifnum; i++) {
++		RTE_LOG(INFO, PMD, "Creating %s\n", ifnames.names[i]);
++		ret = mrvlna_eth_dev_create(vdev, ifnames.names[i]);
++		if (ret)
++			goto out_cleanup;
++	}
++	mrvlna_dev_num += ifnum;
++
++	rte_kvargs_free(kvlist);
++
++	return 0;
++out_cleanup:
++	for (; i > 0; i--)
++		mrvlna_eth_dev_destroy(ifnames.names[i]);
++
++	if (mrvlna_dev_num == 0)
++		mrvlna_deinit_neta();
++out_deinit_dma:
++	if (mrvlna_dev_num == 0)
++		mv_sys_dma_mem_destroy();
++out_free_kvlist:
++	rte_kvargs_free(kvlist);
++
++	return ret;
++}
++
++/**
++ * DPDK callback to remove virtual device.
++ *
++ * @param vdev
++ *   Pointer to the removed virtual device.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
++static int
++rte_pmd_mrvlna_remove(struct rte_vdev_device *vdev)
++{
++	int i;
++	const char *name;
++
++	name = rte_vdev_device_name(vdev);
++	if (!name)
++		return -EINVAL;
++
++	RTE_LOG(INFO, PMD, "Removing %s\n", name);
++
++	for (i = 0; i < rte_eth_dev_count(); i++) {
++		char ifname[RTE_ETH_NAME_MAX_LEN];
++
++		rte_eth_dev_get_name_by_port(i, ifname);
++		mrvlna_eth_dev_destroy(ifname);
++		mrvlna_dev_num--;
++	}
++
++	if (mrvlna_dev_num == 0) {
++		RTE_LOG(INFO, PMD, "Perform MUSDK deinit\n");
++		mrvlna_deinit_neta();
++		mv_sys_dma_mem_destroy();
++	}
++
++	return 0;
++}
++
++static struct rte_vdev_driver pmd_mrvlna_drv = {
++	.probe = rte_pmd_mrvlna_probe,
++	.remove = rte_pmd_mrvlna_remove,
++};
++
++RTE_PMD_REGISTER_VDEV(net_mrvlna, pmd_mrvlna_drv);
++RTE_PMD_REGISTER_ALIAS(net_mrvlna, eth_mrvlna);
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 3380ebf..e5dca96 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -35,6 +35,52 @@
+ #ifndef _MRVL_ETHDEV_H_
+ #define _MRVL_ETHDEV_H_
+ 
++/*
++ * container_of is defined by both DPDK and MUSDK,
++ * we'll declare only one version.
++ *
++ * Note that it is not used in this PMD anyway.
++ */
++#ifdef container_of
++#undef container_of
++#endif
++
++#include <drivers/mv_neta.h>
++#include <drivers/mv_neta_bpool.h>
++
++//TODO check all the defines and offsets!!
++/** Packet offset inside RX buffer. */
++#define MRVL_PKT_OFFS 64
++
++struct neta_priv {
++	/* Hot fields, used in fast path. */
++	struct neta_bpool *bpool;  /**< BPool pointer */
++	struct neta_ppio	*ppio;    /**< Port handler pointer */
++//	rte_spinlock_t lock;	  /**< Spinlock for checking bpool status */
++	uint16_t bpool_max_size;  /**< BPool maximum size */
++	uint16_t bpool_min_size;  /**< BPool minimum size  */
++	uint16_t bpool_init_size; /**< Configured BPool size  */
++
++	/** Mapping for DPDK rx queue->(TC, MRVL relative inq) */
++//	struct {
++//		uint8_t tc;  /**< Traffic Class */
++//		uint8_t inq; /**< Relative in-queue number */
++//	} rxq_map[MRVL_PP2_RXQ_MAX] __rte_cache_aligned;
++
++	/* Configuration data, used sporadically. */
++	uint8_t pp_id;
++	uint8_t ppio_id;
++	uint8_t bpool_bit;
++//	uint8_t uc_mc_flushed;
++//	uint8_t vlan_flushed;
++//	uint8_t isolated;
++
++	struct neta_ppio_params ppio_params;
++	uint16_t nb_rx_queues;
+ 
++//	LIST_HEAD(shaper_profiles, mrvl_tm_shaper_profile) shaper_profiles;
++//	LIST_HEAD(nodes, mrvl_tm_node) nodes;
++	uint64_t rate_max;
++};
+ 
+ #endif /* _MRVL_ETHDEV_H_ */
+-- 
+2.7.4
+

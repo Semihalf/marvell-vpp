@@ -1,0 +1,41 @@
+From 3e0146aba129413786a00aa4979b18a606e894d6 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Fri, 16 Mar 2018 18:05:12 +0100
+Subject: [PATCH 58/74] net/mrvlna: fix rx buffs free; add free to rx flush
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index b73623c..378c59a 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -199,13 +199,12 @@ mrvlna_buffs_alloc(struct neta_priv *priv, struct neta_rxq *rxq, int num)
+  *    Array of rx descriptors
+  */
+ static void
+-mrvlna_recv_buffs_free(struct neta_rxq *rxq, struct neta_ppio_desc *desc)
++mrvlna_recv_buffs_free(struct neta_ppio_desc *desc, uint16_t num)
+ {
+ 	uint64_t addr;
+ 	uint8_t i;
+-	uint64_t size = rxq->size;
+ 
+-	for (i = 0; i < size; i++) {
++	for (i = 0; i < num; i++) {
+ 		if (desc) {
+ 			addr = cookie_addr_high |
+ 					neta_ppio_inq_desc_get_cookie(desc);
+@@ -290,6 +289,8 @@ mrvlna_rx_queue_flush(struct neta_rxq *rxq, struct neta_ppio_desc *descs)
+ 		ret = neta_ppio_recv(rxq->priv->ppio,
+ 					rxq->queue_id,
+ 					descs, (uint16_t *)&num);
++		mrvlna_recv_buffs_free(descs, num);
++		rxq->pkts_processed += num;
+ 	} while (ret == 0 && num);
+ 
+ }
+-- 
+2.7.4
+

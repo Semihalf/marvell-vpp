@@ -1,0 +1,97 @@
+From eb8936fcae95962b9bf239d04544d0e134e2e20b Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Tue, 27 Feb 2018 11:57:35 +0100
+Subject: [PATCH 02/74] crypto/mrvl: add support for crypto/auth NULL
+ algorithms
+
+Add support for both cipher and auth NULL algorithms.
+
+Signed-off-by: Tomasz Duszynski <tdu@semihalf.com>
+---
+ drivers/crypto/mrvl/rte_mrvl_pmd.c     |  6 +++++
+ drivers/crypto/mrvl/rte_mrvl_pmd_ops.c | 45 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+)
+
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd.c b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+index 2e71ac5..393dafa 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd.c
+@@ -81,6 +81,9 @@ __rte_aligned(32);
+  */
+ static const
+ struct cipher_params_mapping cipher_map[RTE_CRYPTO_CIPHER_LIST_END] = {
++	[RTE_CRYPTO_CIPHER_NULL] = {
++		.supported = ALGO_SUPPORTED,
++		.cipher_alg = SAM_CIPHER_NONE },
+ 	[RTE_CRYPTO_CIPHER_3DES_CBC] = {
+ 		.supported = ALGO_SUPPORTED,
+ 		.cipher_alg = SAM_CIPHER_3DES,
+@@ -113,6 +116,9 @@ struct cipher_params_mapping cipher_map[RTE_CRYPTO_CIPHER_LIST_END] = {
+  */
+ static const
+ struct auth_params_mapping auth_map[RTE_CRYPTO_AUTH_LIST_END] = {
++	[RTE_CRYPTO_AUTH_NULL] = {
++		.supported = ALGO_SUPPORTED,
++		.auth_alg = SAM_AUTH_NONE },
+ 	[RTE_CRYPTO_AUTH_MD5_HMAC] = {
+ 		.supported = ALGO_SUPPORTED,
+ 		.auth_alg = SAM_AUTH_HMAC_MD5 },
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c b/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
+index a1de33a..554dec8 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
+@@ -400,6 +400,51 @@ static const struct rte_cryptodev_capabilities
+ 			}, }
+ 		}, }
+ 	},
++	{	/* NULL (AUTH) */
++		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
++		{.sym = {
++			.xform_type = RTE_CRYPTO_SYM_XFORM_AUTH,
++			{.auth = {
++				.algo = RTE_CRYPTO_AUTH_NULL,
++				.block_size = 1,
++				.key_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				},
++				.digest_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				},
++				.iv_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				}
++			}, },
++		}, },
++	},
++	{	/* NULL (CIPHER) */
++		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
++		{.sym = {
++			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
++			{.cipher = {
++				.algo = RTE_CRYPTO_CIPHER_NULL,
++				.block_size = 1,
++				.key_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				},
++				.iv_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				}
++			}, },
++		}, }
++	},
+ 
+ 	RTE_CRYPTODEV_END_OF_CAPABILITIES_LIST()
+ };
+-- 
+2.7.4
+

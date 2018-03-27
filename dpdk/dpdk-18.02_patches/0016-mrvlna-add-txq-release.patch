@@ -1,0 +1,49 @@
+From 31dec71dfcf10cd476d96e359b01023a772b93a1 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 22 Feb 2018 12:59:18 +0100
+Subject: [PATCH 16/74] mrvlna: add txq release
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 80914b7..fa89a31 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -463,6 +463,23 @@ mrvlna_tx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	return 0;
+ }
+ 
++/**
++ * DPDK callback to release the transmit queue.
++ *
++ * @param txq
++ *   Generic transmit queue pointer.
++ */
++static void
++mrvlna_tx_queue_release(void *txq)
++{
++	struct neta_txq *q = txq;
++
++	if (!q)
++		return;
++
++	rte_free(q);
++}
++
+ static const struct eth_dev_ops mrvlna_ops = {
+ 	.dev_configure = mrvlna_dev_configure,
+ //	.dev_start = ,
+@@ -486,7 +503,7 @@ static const struct eth_dev_ops mrvlna_ops = {
+ 	.rx_queue_setup = mrvlna_rx_queue_setup,
+ 	.rx_queue_release = mrvlna_rx_queue_release,
+ 	.tx_queue_setup = mrvlna_tx_queue_setup,
+-//	.tx_queue_release = ,
++	.tx_queue_release = mrvlna_tx_queue_release,
+ };
+ 
+ /**
+-- 
+2.7.4
+

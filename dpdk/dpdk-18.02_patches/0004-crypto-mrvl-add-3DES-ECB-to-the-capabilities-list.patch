@@ -1,0 +1,50 @@
+From 06194e1c59ea7b739d149ac9b6cd7cd1957a27ca Mon Sep 17 00:00:00 2001
+From: Tomasz Duszynski <tdu@semihalf.com>
+Date: Thu, 1 Mar 2018 08:47:48 +0100
+Subject: [PATCH 04/74] crypto/mrvl: add 3DES ECB to the capabilities list
+
+3DES in ECB mode is supported by the PMD thus specific
+entry should exist in the crypto PMD capabilities list.
+
+Fixes: 8a61c83af2fa ("crypto/mrvl: add mrvl crypto driver")
+Cc: stable@dpdk.org
+
+Signed-off-by: Tomasz Duszynski <tdu@semihalf.com>
+---
+ drivers/crypto/mrvl/rte_mrvl_pmd_ops.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c b/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
+index 554dec8..fb4a4db 100644
+--- a/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
++++ b/drivers/crypto/mrvl/rte_mrvl_pmd_ops.c
+@@ -400,6 +400,26 @@ static const struct rte_cryptodev_capabilities
+ 			}, }
+ 		}, }
+ 	},
++	{	/* 3DES ECB */
++		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
++		{.sym = {
++			.xform_type = RTE_CRYPTO_SYM_XFORM_CIPHER,
++			{.cipher = {
++				.algo = RTE_CRYPTO_CIPHER_3DES_ECB,
++				.block_size = 8,
++				.key_size = {
++					.min = 24,
++					.max = 24,
++					.increment = 0
++				},
++				.iv_size = {
++					.min = 0,
++					.max = 0,
++					.increment = 0
++				}
++			}, }
++		}, }
++	},
+ 	{	/* NULL (AUTH) */
+ 		.op = RTE_CRYPTO_OP_TYPE_SYMMETRIC,
+ 		{.sym = {
+-- 
+2.7.4
+

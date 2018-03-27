@@ -1,0 +1,61 @@
+From 042c4cbad7df5fdeddc44d7ac17780e0e0ee085a Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Thu, 15 Mar 2018 12:40:18 +0100
+Subject: [PATCH 52/74] net/mrvlna: fix buffer refill threshold
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 8 +++++---
+ drivers/net/mrvlna/mrvlna_ethdev.h | 2 --
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index d4c342b..f1e98df 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -72,6 +72,7 @@
+ #define MRVLNA_PKT_EFFEC_OFFS (MRVL_NETA_PKT_OFFS + MV_MH_SIZE)
+ 
+ uint64_t cookie_addr_high = MRVLNA_COOKIE_ADDR_INVALID;
++uint16_t rx_desc_free_thresh = MRVL_NETA_BUF_RELEASE_BURST_SIZE;
+ 
+ static const char * const valid_args[] = {
+ 	MRVL_IFACE_NAME_ARG,
+@@ -581,11 +582,11 @@ mrvlna_rx_pkt_burst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+ 	}
+ 	q->pkts_processed += rx_done;
+ 
+-	if (q->pkts_processed > MVRL_NETA_RX_FREE_THRESH) {
+-		ret = mrvlna_buffs_alloc(q->priv, q, MVRL_NETA_RX_FREE_THRESH);
++	if (q->pkts_processed > rx_desc_free_thresh) {
++		ret = mrvlna_buffs_alloc(q->priv, q, rx_desc_free_thresh);
+ 		if (ret)
+ 			RTE_LOG(ERR, PMD, "Refill failed\n");
+-		q->pkts_processed -= MVRL_NETA_RX_FREE_THRESH;
++		q->pkts_processed -= rx_desc_free_thresh;
+ 	}
+ 
+ 	return rx_done;
+@@ -851,6 +852,7 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	rxq->queue_id = idx;
+ 	rxq->port_id = dev->data->port_id;
+ 	rxq->size = desc;
++	rx_desc_free_thresh = RTE_MIN(rx_desc_free_thresh, (desc/2));
+ 	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
+ 		desc;
+ 
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index e629451..7a395a3 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -80,8 +80,6 @@
+ /** Minimum number of sent buffers to release from shadow queue to BM */
+ #define MRVL_NETA_BUF_RELEASE_BURST_SIZE	64
+ 
+-#define MVRL_NETA_RX_FREE_THRESH (MRVL_NETA_BUF_RELEASE_BURST_SIZE * 2)
+-
+ #define MRVL_NETA_MTU_TO_MRU(mtu) \
+ 	((mtu) + MV_MH_SIZE + ETHER_HDR_LEN + ETHER_CRC_LEN)
+ #define MRVL_NETA_MRU_TO_MTU(mru) \
+-- 
+2.7.4
+

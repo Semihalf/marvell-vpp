@@ -1,0 +1,158 @@
+From 07c6f285992a9f91d2e18151730ad8fa13602090 Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Tue, 27 Feb 2018 18:21:04 +0100
+Subject: [PATCH 26/74] mrvlna: add buffers deallocation function + add rxq
+ fields
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 58 +++++++++++++++++++++++++++++++-------
+ drivers/net/mrvlna/mrvlna_ethdev.h |  1 +
+ 2 files changed, 49 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 8ce3276..db4fd61 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -55,6 +55,8 @@
+ #define MRVL_IFACE_NAME_ARG "iface"
+ #define MRVL_CFG_ARG "cfg"
+ 
++#define MRVLNA_COOKIE_ADDR_INVALID ~0ULL
++
+ //TODO 1 check all the defines and offsets!!
+ #define MRVL_MUSDK_DMA_MEMSIZE 41943040 // (40 * 1024 * 1024)
+ //TODO 1
+@@ -65,6 +67,8 @@
+ //TODO 1
+ #define MRVLNA_PKT_EFFEC_OFFS (MRVL_PKT_OFFS + MV_MH_SIZE)
+ 
++uint64_t cookie_addr_high = MRVLNA_COOKIE_ADDR_INVALID;
++
+ static const char * const valid_args[] = {
+ 	MRVL_IFACE_NAME_ARG,
+ 	NULL
+@@ -101,16 +105,15 @@ struct neta_rxq {
+ 	struct rte_mempool *mp;
+ 	int queue_id;
+ 	int port_id;
++	int size;
+ 	int cksum_enabled;
+ 	uint64_t bytes_recv;
+ 	uint64_t drop_mac;
+-	uint16_t requested_descs;
+ 	/* Virtual address of the RX DMA descriptors array */
+ 	struct neta_ppio_desc *descs;
+-	/* DMA address of the RX DMA descriptors array */
+-	dma_addr_t descs_phys;
+ };
+ 
++
+ struct neta_txq {
+ 	struct neta_priv *priv;
+ 	int queue_id;
+@@ -125,6 +128,14 @@ static int mrvlna_lcore_first;
+ static int mrvlna_lcore_last;
+ 
+ 
++
++/**
++ * Allocate buffers from mempool
++ * and store addresses in rx descriptors.
++ *
++ * @return
++ *   0 on success, negative error value otherwise.
++ */
+ static int
+ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ {
+@@ -133,7 +144,7 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ 	uint16_t nb_desc;
+ 	int ret, i;
+ 
+-	nb_desc = rxq->requested_descs;
++	nb_desc = rxq->size;
+ 	ret = rte_pktmbuf_alloc_bulk(rxq->mp, mbufs, nb_desc);
+ 	if (ret)
+ 		RTE_LOG(ERR, PMD,
+@@ -155,6 +166,29 @@ mrvlna_alloc_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
+ }
+ 
+ /**
++ * Return mbufs to mempool.
++ */
++static void
++mrvlna_free_buffs(struct neta_priv *priv, struct neta_rxq *rxq)
++{
++	uint64_t addr;
++	uint8_t i;
++	uint64_t size = priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size;
++
++	// TODO this should be done by using mvneta API somehow
++	for (i = 0; i < size; i++) {
++		if (rxq->descs) {
++			addr = /*cookie_addr_high | */rxq->descs->cmds[4];
++			if (addr)
++				rte_pktmbuf_free((struct rte_mbuf *)addr);
++			rxq->descs++;
++		}
++	}
++
++	rte_free(rxq);
++}
++
++/**
+  * Deinitialize packet processor.
+  */
+ static void
+@@ -162,6 +196,7 @@ mrvlna_deinit_neta(void)
+ {
+ 	neta_deinit();
+ }
++
+ /**
+  * Initialize packet processor.
+  *
+@@ -409,12 +444,7 @@ mrvlna_rx_queue_setup(struct rte_eth_dev *dev, uint16_t idx, uint16_t desc,
+ 	rxq->cksum_enabled = dev->data->dev_conf.rxmode.hw_ip_checksum;
+ 	rxq->queue_id = idx;
+ 	rxq->port_id = dev->data->port_id;
+-	rxq->requested_descs = desc; /* the number of descs to be allocated later */
+-
+-//	if (priv->bpool_en == 1)
+-//		;//mrvlna_port_to_bpool_lookup[rxq->port_id] = priv->bpool;
+-
+-
++	rxq->size = desc;
+ 	priv->ppio_params.inqs_params.tcs_params[MRVL_NETA_DEFAULT_TC].size =
+ 		desc;
+ 
+@@ -586,6 +616,14 @@ static void
+ mrvlna_dev_stop(struct rte_eth_dev *dev)
+ {
+ 	struct neta_priv *priv = dev->data->dev_private;
++	int i;
++
++	//TODO flush rx/tx queues
++	for (i = 0; i < dev->data->nb_rx_queues; i++) {
++		struct neta_rxq *rxq = dev->data->rx_queues[i];
++
++		mrvlna_free_buffs(priv, rxq);
++	}
+ 
+ 	neta_ppio_deinit(priv->ppio);
+ 
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.h b/drivers/net/mrvlna/mrvlna_ethdev.h
+index 2cf925a..6d166ed 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.h
++++ b/drivers/net/mrvlna/mrvlna_ethdev.h
+@@ -63,6 +63,7 @@
+ 
+ /** Tx queue descriptors alignment in B */
+ #define MRVL_NETA_TXD_ALIGN 32
++#define MVNETA_DESC_ALIGNED_SIZE	32
+ 
+ /** Minimum/maximum number of descriptors in rx queue TODO is it? */
+ #define MRVL_NETA_RXD_MIN 16
+-- 
+2.7.4
+

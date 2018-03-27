@@ -1,0 +1,42 @@
+From c6cf5dcaf92a34dfcc9ad37b3e78202c53049c0e Mon Sep 17 00:00:00 2001
+From: Zyta Szpak <zr@semihalf.com>
+Date: Mon, 5 Mar 2018 15:48:54 +0100
+Subject: [PATCH 36/74] mrvlna: get link state via ioctl
+
+---
+ drivers/net/mrvlna/mrvlna_ethdev.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/mrvlna/mrvlna_ethdev.c b/drivers/net/mrvlna/mrvlna_ethdev.c
+index 0dafc26..4efe054 100644
+--- a/drivers/net/mrvlna/mrvlna_ethdev.c
++++ b/drivers/net/mrvlna/mrvlna_ethdev.c
+@@ -786,6 +786,13 @@ mrvlna_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
+ 		return -EFAULT;
+ 	}
+ 
++	ret = ioctl(fd, SIOCGIFFLAGS, &req);
++	if (ret == -1) {
++		close(fd);
++		return -EFAULT;
++	}
++	link_up = (req.ifr_flags & IFF_RUNNING);
++
+ 	close(fd);
+ 
+ 	switch (ethtool_cmd_speed(&edata)) {
+@@ -810,7 +817,10 @@ mrvlna_link_update(struct rte_eth_dev *dev, int wait_to_complete __rte_unused)
+ 	dev->data->dev_link.link_autoneg = edata.autoneg ? ETH_LINK_AUTONEG :
+ 							   ETH_LINK_FIXED;
+ 
+-	neta_ppio_get_link_state(priv->ppio, &link_up);
++	/*
++	 * This function is declared but not implemented in MUSDK
++	 */
++/*	neta_ppio_get_link_state(priv->ppio, &link_up); */
+ 	dev->data->dev_link.link_status = link_up ? ETH_LINK_UP : ETH_LINK_DOWN;
+ 
+ 	return 0;
+-- 
+2.7.4
+
