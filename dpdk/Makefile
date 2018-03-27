@@ -215,8 +215,12 @@ $(B)/custom-config: $(B)/.patch.ok Makefile
 	$(call set,RTE_LIBRTE_MLX5_PMD,$(DPDK_MLX5_PMD))
 	$(call set,RTE_LIBRTE_MLX4_DLOPEN_DEPS,$(DPDK_MLX4_PMD))
 	$(call set,RTE_LIBRTE_MLX5_DLOPEN_DEPS,$(DPDK_MLX5_PMD))
-	$(call set,RTE_LIBRTE_MRVL_PMD,y)
-	$(call set,RTE_LIBRTE_PMD_MRVL_CRYPTO,y)
+	@# My changes
+	$(call set,RTE_LIBRTE_MRVL_PMD,n)
+	$(call set,RTE_LIBRTE_PMD_MRVL_CRYPTO,n)
+	$(call set,RTE_LIBRTE_MVNETA_PMD,y)
+	$(call set,RTE_LIBRTE_VHOST_NUMA,n)
+	$(call set,RTE_EAL_NUMA_AWARE_HUGEPAGES,n)
 	@# not needed
 	$(call set,RTE_LIBRTE_PMD_TAP,n)
 	$(call set,RTE_LIBRTE_TIMER,n)
