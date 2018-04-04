@@ -176,7 +176,6 @@ AS_IF([test "$cc_flag_check" = yes],
 AM_CONDITIONAL([CC_SUPPORTS_AVX512], [test "$march_skylake_avx512" = "yes"])
 
 AS_CASE([$build_cpu],
-	[x86_64], [CPU_FLAGS="-march=corei7 -mtune=corei7-avx"],
 	[aarch64], [CPU_FLAGS="-march=armv8-a+crc"],
 	[CPU_FLAGS=""],
 )
