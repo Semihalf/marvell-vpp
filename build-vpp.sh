@@ -73,7 +73,7 @@ fi
       --enable-pp2=no \
       --enable-sam \
       --enable-bpool-dma=64 \
-      --enable-neta \
+      --enable-neta
 #      --disable-shared
 #      --enable-sam-debug \
 
