@@ -13,8 +13,6 @@ export DPDK_PATH=${ROOTDIR}/marvell-dpdk
 export MUSDK_PATH=${ROOTDIR}/musdk
 export VPP_PATH=${ROOTDIR}/marvell-vpp
 
-rm -rf output
-
 #### Fetch sources
 if [ "${1}" == "initial" ]; then
 git clone https://github.com/Semihalf/marvell-dpdk.git ${MUSDK_PATH} -b musdk-armada-17.10-mvneta
@@ -119,7 +117,10 @@ fi
 make -j8 build-release PLATFORM=a3k
 
 #### Prepare package
+echo -e "\nPREPARE OUTPUT DIRECTORY\n"
 cd ${ROOTDIR}
+rm -rf output
+
 mkdir -p output/modules
 cp ${MUSDK_PATH}/modules/uio/musdk_uio.ko output/modules
 cp ${MUSDK_PATH}/modules/neta/mv_neta_uio.ko output/modules
