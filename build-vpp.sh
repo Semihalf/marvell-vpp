@@ -19,7 +19,28 @@ git clone https://github.com/Semihalf/marvell-dpdk.git ${MUSDK_PATH} -b musdk-ar
 git clone https://github.com/Semihalf/marvell-dpdk.git ${DPDK_PATH} -b mrvl-dev-a3k
 git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git ${KDIR} -b linux-4.4.52-armada-17.10
 git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b mvneta_on_mrvl_on_master_22_03
+
+#### Install tools
 sudo apt install gcc-aarch64-linux-gnu
+sudo apt install g++-aarch64-linux-gnu
+
+sudo apt install libtool
+sudo apt install automake
+sudo apt install bc
+
+#Prepare arm64 libraries
+sudo dpkg --add-architecture arm64
+sudo vi /etc/apt/sources.list.d/arm64.list
+#Paste below (after uncommenting):
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial main restricted
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates main restricted
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial universe
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates universe
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial multiverse
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates multiverse
+#deb [arch=arm64] http://ports.ubuntu.com/ xenial-backports main restricted universe multiverse
+sudo apt update
+sudo apt install libnuma-dev:arm64 libmbedtls-dev:arm64 libssl-dev:arm64 libboost-thread-dev:arm64
 fi
 
 #### Linux
@@ -42,10 +63,6 @@ mv .git.b .git
 cd $MUSDK_PATH
 echo -e "\nBUILD MUSDK\n"
 if [ "${1}" == "initial" ]; then
-sudo apt-get install libtool
-sudo apt-get install automake
-sudo apt-get install bc
-
 git am ${ROOTDIR}/patches/0001-musdk-add-compile-option-fPIC.PATCH
 fi
 if [ "${1}" == "clean" ]; then
@@ -93,21 +110,6 @@ cd $VPP_PATH
 make install-dep
 
 if [ "${1}" == "initial" ]; then
-#Prepare arm64 libraries
-sudo dpkg --add-architecture arm64
-sudo vi /etc/apt/sources.list.d/arm64.list
-#Paste below (after uncommenting):
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial main restricted
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates main restricted
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial universe
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates universe
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial multiverse
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial-updates multiverse
-#deb [arch=arm64] http://ports.ubuntu.com/ xenial-backports main restricted universe multiverse
-sudo apt update
-sudo apt-get install libnuma-dev:arm64 libmbedtls-dev:arm64 libssl-dev:arm64 libboost-thread-dev:arm64
-sudo apt install g++-aarch64-linux-gnu
-
 #Apply patch and create tag
 git am ${ROOTDIR}/patches/0001-vpp-add-cross-compile-for-a3k.patch
 git tag -a a3k_2803 -m "a3k"
