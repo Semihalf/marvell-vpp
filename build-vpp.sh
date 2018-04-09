@@ -3,7 +3,7 @@
 #### Prepare environment
 export ROOTDIR=${PWD}
 export ARCH=arm64
-export CROSS_COMPILE=/opt/gcc-linaro-5.3.1-2016.05-x86_64_aarch64-linux-gnu/bin/aarch64-linux-gnu-
+export CROSS_COMPILE=aarch64-linux-gnu-
 export CROSS=$CROSS_COMPILE
 export KDIR=${ROOTDIR}/linux-marvell
 export RTE_KERNELDIR=$KDIR
@@ -19,6 +19,7 @@ git clone https://github.com/Semihalf/marvell-dpdk.git ${MUSDK_PATH} -b musdk-ar
 git clone https://github.com/Semihalf/marvell-dpdk.git ${DPDK_PATH} -b mrvl-dev-a3k
 git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git ${KDIR} -b linux-4.4.52-armada-17.10
 git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b mvneta_on_mrvl_on_master_22_03
+sudo apt install gcc-aarch64-linux-gnu
 fi
 
 #### Linux
@@ -106,7 +107,6 @@ sudo vi /etc/apt/sources.list.d/arm64.list
 #deb [arch=arm64] http://ports.ubuntu.com/ xenial-backports main restricted universe multiverse
 sudo apt update
 sudo apt-get install libnuma-dev:arm64 libmbedtls-dev:arm64 libssl-dev:arm64 libboost-thread-dev:arm64
-sudo apt install gcc-aarch64-linux-gnu
 sudo apt install g++-aarch64-linux-gnu
 
 #Apply patch and create tag
