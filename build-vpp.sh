@@ -45,6 +45,7 @@ echo -e "\nBUILD MUSDK\n"
 if [ "${1}" == "initial" ]; then
 sudo apt-get install libtool
 sudo apt-get install automake
+sudo apt-get install bc
 
 git am ${ROOTDIR}/patches/0001-musdk-add-compile-option-fPIC.PATCH
 fi
