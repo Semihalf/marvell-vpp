@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #### Prepare environment
 export ROOTDIR=${PWD}
 export ARCH=arm64
