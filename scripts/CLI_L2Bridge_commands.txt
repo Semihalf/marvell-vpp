@@ -1,0 +1,5 @@
+set int state Two_FiveGigabitEthernet0 up
+set int state Two_FiveGigabitEthernet1 up
+create bridge-domain 1
+set interface l2 bridge Two_FiveGigabitEthernet0 1
+set interface l2 bridge Two_FiveGigabitEthernet1 1

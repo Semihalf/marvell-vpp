@@ -1,0 +1,107 @@
+From a6cb4e3371cfb758724b4f266c5b56f02894bef8 Mon Sep 17 00:00:00 2001
+From: Joe Zhou <shjzhou@marvell.com>
+Date: Wed, 4 Apr 2018 02:49:15 -0700
+Subject: [PATCH] vpp: add cross compile for a3k
+
+Change-Id: I07b38645a089d7bf5e4f381de59511e85abe2dad
+---
+ build-data/platforms/a3k.mk | 60 +++++++++++++++++++++++++++++++++++++++++++++
+ src/configure.ac            |  1 -
+ src/plugins/dpdk.am         |  2 +-
+ 3 files changed, 61 insertions(+), 2 deletions(-)
+ create mode 100644 build-data/platforms/a3k.mk
+
+diff --git a/build-data/platforms/a3k.mk b/build-data/platforms/a3k.mk
+new file mode 100644
+index 0000000..b759ecb
+--- /dev/null
++++ b/build-data/platforms/a3k.mk
+@@ -0,0 +1,60 @@
++MACHINE = aarch64
++
++a3k_arch = aarch64
++a3k_os = linux-gnu
++a3k_target = aarch64-linux-gnu
++a3k_mtune = cortex-A57
++a3k_march = "armv8-a+fp+simd+crc+crypto"
++a3k_cross_ldflags = \
++	-Wl,--dynamic-linker=/lib/ld-linux-aarch64.so.1 \
++	-Wl,-rpath=/usr/lib64
++
++a3k_native_tools = vppapigen
++#a3k_root_packages = vpp vlib vlib-api vnet svm vpp-api-test
++a3k_root_packages = vpp
++
++# DPDK configuration parameters
++a3k_uses_dpdk = yes
++# Compile with external DPDK only if "DPDK_PATH" variable is defined where we have
++# installed DPDK libraries and headers.
++ifeq ($(PLATFORM),a3k)
++a3k_uses_dpdk = yes
++a3k_uses_external_dpdk = yes
++a3k_dpdk_inc_dir = $(DPDK_PATH)/build/include
++a3k_dpdk_lib_dir = $(DPDK_PATH)/build/lib
++endif
++a3k_dpdp_target = arm64-armv8a-linuxapp-gcc
++#vpp_configure_args_a3k = --with-dpdk --without-libssl \
++	--with-sysroot=$(SYSROOT)
++#vnet_configure_args_a3k = --with-dpdk --without-libssl \
++	--with-sysroot=$(SYSROOT)
++
++# Set these parameters carefully. The vlib_buffer_t is 256 bytes, i.e.
++#vlib_configure_args_a3k = --with-pre-data=256
++
++
++a3k_debug_TAG_CFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
++			-march=$(MARCH) -fPIC -Werror
++a3k_debug_TAG_CXXFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
++			-march=$(MARCH) -fPIC -Werror
++a3k_debug_TAG_LDFLAGS = -g -O2 -DCLIB_DEBUG -fPIC -fstack-protector-all \
++			-march=$(MARCH) -fPIC -Werror
++
++# Use -rdynamic is for stack tracing, O0 for debugging....default is O2
++# Use -DCLIB_LOG2_CACHE_LINE_BYTES to change cache line size
++a3k_TAG_CFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(a3k_mtune) \
++		-mtune=$(a3k_mtune) -funroll-all-loops -fPIC -Werror
++a3k_TAG_CXXFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(a3k_mtune) \
++		-mtune=$(a3k_mtune) -funroll-all-loops -fPIC -Werror
++a3k_TAG_LDFLAGS = -g -O2 -march=$(MARCH) -mcpu=$(a3k_mtune) \
++		-mtune=$(a3k_mtune) -funroll-all-loops -fPIC -Werror
++
++a3k_clang_TAG_CFLAGS = -g -O2 -DFORTIFY_SOURCE=2 -fstack-protector -fPIC -Werror
++a3k_clang_TAG_LDFLAGS = -g -O2 -DFORTIFY_SOURCE=2 -fstack-protector -fPIC -Werror
++
++a3k_gcov_TAG_CFLAGS = -g -O0 -DCLIB_DEBUG -fPIC -Werror -fprofile-arcs -ftest-coverage
++a3k_gcov_TAG_LDFLAGS = -g -O0 -DCLIB_DEBUG -fPIC -Werror -coverage
++
++a3k_coverity_TAG_CFLAGS = -g -O2 -fPIC -Werror -D__COVERITY__
++a3k_coverity_TAG_LDFLAGS = -g -O2 -fPIC -Werror -D__COVERITY__
++
+diff --git a/src/configure.ac b/src/configure.ac
+index c455423..3f2ea6b 100644
+--- a/src/configure.ac
++++ b/src/configure.ac
+@@ -176,7 +176,6 @@ AS_IF([test "$cc_flag_check" = yes],
+ AM_CONDITIONAL([CC_SUPPORTS_AVX512], [test "$march_skylake_avx512" = "yes"])
+ 
+ AS_CASE([$build_cpu],
+-	[x86_64], [CPU_FLAGS="-march=corei7 -mtune=corei7-avx"],
+ 	[aarch64], [CPU_FLAGS="-march=armv8-a+crc"],
+ 	[CPU_FLAGS=""],
+ )
+diff --git a/src/plugins/dpdk.am b/src/plugins/dpdk.am
+index 07d39d6..11f6e71 100644
+--- a/src/plugins/dpdk.am
++++ b/src/plugins/dpdk.am
+@@ -28,7 +28,7 @@ endif
+ dpdk_plugin_la_CFLAGS = $(AM_CFLAGS)
+ dpdk_plugin_la_LDFLAGS += -Wl,-lnuma
+ 
+-dpdk_plugin_la_LDFLAGS += -Wl,-lm,-ldl,-lmusdk
++dpdk_plugin_la_LDFLAGS += -L$(LIBMUSDK_PATH)/lib -Wl,-lm,-ldl,-lmusdk
+ dpdk_plugin_la_LIBADD =
+ 
+ dpdk_plugin_la_SOURCES =					\
+-- 
+2.7.4
+

@@ -1,0 +1,26 @@
+From a2ae48018e296a36a5cd5ae743c82df118617a30 Mon Sep 17 00:00:00 2001
+From: Joe Zhou <shjzhou@marvell.com>
+Date: Wed, 4 Apr 2018 02:50:26 -0700
+Subject: [PATCH] musdk: add compile option -fPIC
+
+Change-Id: Id75cf4eb2dc6b1fedd859642d669ef532625282f
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 997cc32..60757d1 100755
+--- a/configure.ac
++++ b/configure.ac
+@@ -161,7 +161,7 @@ fi
+ # and are optional during user compilation.
+ MUSDK_CFLAGS+="-DMVCONF_TYPES_PUBLIC "
+ MUSDK_CFLAGS+="-DMVCONF_DMA_PHYS_ADDR_T_PUBLIC "
+-
++MUSDK_CFLAGS+="-fPIC "
+ 
+ # Checks for programs.
+ AC_PROG_CC
+-- 
+2.7.4
+

@@ -1,0 +1,18 @@
+set int state Two_FiveGigabitEthernet0 up
+set int state Two_FiveGigabitEthernet1 up
+set interface ip address Two_FiveGigabitEthernet0 192.168.100.1/24
+set interface ip address Two_FiveGigabitEthernet1 192.168.10.100/24
+set ip arp Two_FiveGigabitEthernet0 192.168.100.2 00:54:32:00:00:01
+set ip arp Two_FiveGigabitEthernet1 192.168.10.200 00:54:32:00:00:04
+set ip arp Two_FiveGigabitEthernet1 192.168.200.2 00:54:32:00:00:04
+ip route add 0.0.0.0/0 via 192.168.10.200 Two_FiveGigabitEthernet1
+ip route add 192.168.10.0/24 via 192.168.10.100 Two_FiveGigabitEthernet1
+ip route add 192.168.100.0/24 via 192.168.100.1 Two_FiveGigabitEthernet0
+ipsec sa add 10 spi 1001 esp crypto-alg aes-cbc-128 crypto-key 4a506a794f574265564551694d653768 integ-alg sha1-96 integ-key 4339314b55523947594d6d3547666b45764e6a58
+ipsec sa add 20 spi 1000 esp crypto-alg aes-cbc-128 crypto-key 4a506a794f574265564551694d653768 integ-alg sha1-96 integ-key 4339314b55523947594d6d3547666b45764e6a58
+ipsec spd add 1
+set interface ipsec spd Two_FiveGigabitEthernet1 1
+ipsec policy add spd 1 priority 100 inbound action bypass protocol 50
+ipsec policy add spd 1 priority 100 outbound action bypass protocol 50
+ipsec policy add spd 1 priority 10 inbound action protect sa 20 local-ip-range 192.168.100.1 - 192.168.100.10 remote-ip-range 192.168.200.1 - 192.168.200.10
+ipsec policy add spd 1 priority 10 outbound action protect sa 10 local-ip-range 192.168.100.1 - 192.168.100.10 remote-ip-range 192.168.200.1 - 192.168.200.10
