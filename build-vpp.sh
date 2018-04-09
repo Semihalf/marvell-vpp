@@ -107,6 +107,10 @@ make -j8 examples T=arm64-armv8a-linuxapp-gcc
 #### VPP
 echo -e "\nBUILD VPP\n"
 cd $VPP_PATH
+if [ "${1}" == "clean" ]; then
+git clean -xdf
+fi
+
 make install-dep
 
 if [ "${1}" == "initial" ]; then
