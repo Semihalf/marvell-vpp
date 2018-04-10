@@ -12,9 +12,9 @@ echo "set interface ip address $LAN_INTERFACE 192.168.100.1/24"
 echo "set interface ip address $WAN_INTERFACE 192.168.10.100/24"
 
 ## Static ARP Entries
-echo "set ip arp $LAN_INTERFACE 192.168.100.2 $LAN_MAC"
-echo "set ip arp $WAN_INTERFACE 192.168.10.200 $WAN_MAC"
-echo "set ip arp $WAN_INTERFACE 192.168.200.2 $WAN_MAC"
+# echo "set ip arp $LAN_INTERFACE 192.168.100.2 $LAN_MAC"
+# echo "set ip arp $WAN_INTERFACE 192.168.10.200 $WAN_MAC"
+# echo "set ip arp $WAN_INTERFACE 192.168.200.2 $WAN_MAC"
 
 ## Static Routing Entries
 # The first entry is the default rule for all to-WAN traffic (e.g., default gateway. Here, it indicates the next hop to route to the remote IXIA port)

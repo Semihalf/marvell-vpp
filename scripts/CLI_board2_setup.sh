@@ -9,9 +9,9 @@ echo "set int state $WAN_INTERFACE up"
 echo "set interface ip address $LAN_INTERFACE 192.168.200.1/24"
 echo "set interface ip address $WAN_INTERFACE 192.168.10.200/24"
 
-echo "set ip arp $LAN_INTERFACE 192.168.200.2 $LAN_MAC"
-echo "set ip arp $WAN_INTERFACE 192.168.10.100 $WAN_MAC"
-echo "set ip arp $WAN_INTERFACE 192.168.100.2 $WAN_MAC"
+# echo "set ip arp $LAN_INTERFACE 192.168.200.2 $LAN_MAC"
+# echo "set ip arp $WAN_INTERFACE 192.168.10.100 $WAN_MAC"
+# echo "set ip arp $WAN_INTERFACE 192.168.100.2 $WAN_MAC"
 
 echo "ip route add 0.0.0.0/0 via 192.168.10.100 $WAN_INTERFACE"
 echo "ip route add 192.168.10.0/24 via 192.168.10.200 $WAN_INTERFACE"
