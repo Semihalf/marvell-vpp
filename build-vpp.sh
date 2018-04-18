@@ -188,10 +188,9 @@ else
 	cp ${MUSDK_PATH}/modules/pp2/mv_pp_uio.ko output/modules
 fi
 
-mkdir -p output/vpp_plugins
-cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/lib64/vpp_plugins
+mkdir -p output/lib64/vpp_plugins/
+cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/lib64/vpp_plugins/
 
-mkdir -p output/lib64
 cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/lib* output/lib64
 
 mkdir -p output/images
@@ -206,7 +205,12 @@ fi
 mkdir -p output/bin
 cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/bin/vpp* output/bin
 
-cp scripts/start_with_crypto.sh output/
+if [ "${BOARD}" == "a3k" ]; then
+	cp scripts/*a3k* output/
+else
+	cp scripts/*a8k* output/
+fi
+
 tar -czf vpp.tgz output/*
 
 echo -e "\nBUILD COMPLETE\n"
