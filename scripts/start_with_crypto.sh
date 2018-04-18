@@ -18,4 +18,4 @@ insmod ./modules/crypto_safexcel.ko rings=0,0
 insmod ./modules/mv_sam_uio.ko
 
 
-$ROOT_DIR/bin/vpp $STARTUP_PARAMETERS heapsize 50M plugin_path $ROOT_DIR/vpp_plugins/
+$ROOT_DIR/bin/vpp $STARTUP_PARAMETERS heapsize 50M plugin_path $ROOT_DIR/lib64/vpp_plugins/

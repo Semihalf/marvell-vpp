@@ -13,9 +13,14 @@ export DPDK_PATH=${ROOTDIR}/marvell-dpdk
 export MUSDK_PATH=${ROOTDIR}/musdk
 export VPP_PATH=${ROOTDIR}/marvell-vpp
 
+export DATE=`date +%Y_%m_%d`
+
 #### Fetch sources
 if [ "${1}" == "initial" ]; then
 git clone https://github.com/Semihalf/marvell-dpdk.git ${MUSDK_PATH} -b musdk-armada-17.10-mvneta
+cd ${MUSDK_PATH}
+git checkout origin/musdk-armada-17.10 -b musdk-armada-17.10
+cd -
 git clone https://github.com/Semihalf/marvell-dpdk.git ${DPDK_PATH} -b mrvl-dev-a3k
 git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git ${KDIR} -b linux-4.4.52-armada-17.10
 git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b mvneta_on_mrvl_on_master_22_03
@@ -43,6 +48,21 @@ sudo apt update
 sudo apt install libnuma-dev:arm64 libmbedtls-dev:arm64 libssl-dev:arm64 libboost-thread-dev:arm64
 fi
 
+if [ "${BOARD}" == "a3k" ]; then
+	cd ${MUSDK_PATH}
+	git checkout musdk-armada-17.10-mvneta
+	cd -
+elif [ "${BOARD}" == "a8k" ]; then
+	cd ${MUSDK_PATH}
+	git checkout musdk-armada-17.10
+	cd -
+else
+	echo "Specify the target board by exporting the BOARD variable"
+	exit 1
+fi
+	
+
+
 #### Linux
 echo -e "\nBUILD KERNEL\n"
 cd ${KDIR}
@@ -62,24 +82,47 @@ mv .git.b .git
 #### MUSDK
 cd $MUSDK_PATH
 echo -e "\nBUILD MUSDK\n"
+
 if [ "${1}" == "initial" ]; then
 git am ${ROOTDIR}/patches/0001-musdk-add-compile-option-fPIC.PATCH
 fi
+
 if [ "${1}" == "clean" ]; then
 make clean
 fi
+
+if [ DEBUG == "1" ]; then
+	export DEBUG_FLAGS="--enable-debug-level=7 --enable-sam-debug"
+else
+	export DEBUG_FLAGS=""
+fi
+
 ./bootstrap
+if [ "${BOARD}" == "a3k" ]; then
 ./configure \
       --enable-pp2=no \
+      --enable-neta \
       --enable-sam \
-      --enable-bpool-dma=64 \
-      --enable-neta
-#      --disable-shared
-#      --enable-sam-debug \
+      --enable-bpool-dma=64 ${DEBUG_FLAGS}
+else
+./configure \
+      --enable-sam \
+      --enable-bpool-dma=64 ${DEBUG_FLAGS}
+fi
 
 make -j8
 make install
-make -C modules/neta
+
+if [ "${BOARD}" == "a3k" ]; then
+	make -C modules/neta
+else
+	make -C modules/pp2
+	cd ${ROOTDIR}/mvpp2x-marvell/sysfs/
+	mv Makefile_sysfs Makefile
+	make -j8
+	cd -
+fi
+
 make -C modules/sam
 make -C modules/uio
 
@@ -90,7 +133,15 @@ if [ "${1}" == "clean" ]; then
 make clean
 fi
 make config T=${RTE_TARGET}
-sed -i "s/MVNETA_PMD=n/MVNETA_PMD=y/" build/.config
+
+if [ "${BOARD}" == "a3k" ]; then
+	sed -i "s/MVNETA_PMD=n/MVNETA_PMD=y/" build/.config
+	sed -i "s/MRVL_PMD=y/MRVL_PMD=n/" build/.config
+else
+	sed -i "s/MVNETA_PMD=y/MVNETA_PMD=n/" build/.config
+	sed -i "s/MRVL_PMD=n/MRVL_PMD=y/" build/.config
+fi
+
 sed -i "s/MRVL_CRYPTO=n/MRVL_CRYPTO=y/" build/.config
 sed -i "s/VHOST_NUMA=y/VHOST_NUMA=n/" build/.config
 sed -i "s/NUMA_AWARE_HUGEPAGES=y/NUMA_AWARE_HUGEPAGES=n/" build/.config
@@ -116,7 +167,7 @@ make install-dep
 if [ "${1}" == "initial" ]; then
 #Apply patch and create tag
 git am ${ROOTDIR}/patches/0001-vpp-add-cross-compile-for-a3k.patch
-git tag -a a3k_2803 -m "a3k"
+git tag -a ${BOARD}_${DATE} -m ${BOARD}
 fi
 
 make -j8 build-release PLATFORM=a3k
@@ -128,19 +179,29 @@ rm -rf output
 
 mkdir -p output/modules
 cp ${MUSDK_PATH}/modules/uio/musdk_uio.ko output/modules
-cp ${MUSDK_PATH}/modules/neta/mv_neta_uio.ko output/modules
 cp ${MUSDK_PATH}/modules/sam/mv_sam_uio.ko output/modules
 cp ${KDIR}/drivers/crypto/inside-secure/crypto_safexcel.ko output/modules
 
+if [ "${BOARD}" == "a3k" ]; then
+	cp ${MUSDK_PATH}/modules/neta/mv_neta_uio.ko output/modules
+else
+	cp ${MUSDK_PATH}/modules/pp2/mv_pp_uio.ko output/modules
+fi
+
 mkdir -p output/vpp_plugins
-cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/vpp_plugins
+cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/lib64/vpp_plugins
 
 mkdir -p output/lib64
 cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/lib* output/lib64
 
 mkdir -p output/images
 cp ${KDIR}/arch/arm64/boot/Image output/images
-cp ${KDIR}/arch/arm64/boot/dts/marvell/armada-37*.dtb output/images
+
+if [ "${BOARD}" == "a3k" ]; then
+	cp ${KDIR}/arch/arm64/boot/dts/marvell/armada-37*.dtb output/images
+else
+	cp ${KDIR}/arch/arm64/boot/dts/marvell/armada-8040*.dtb output/images
+fi
 
 mkdir -p output/bin
 cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/bin/vpp* output/bin
