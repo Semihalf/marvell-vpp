@@ -22,4 +22,26 @@ tar -xf vpp.tgz
 
 The VPP should successfully run and reach prompt.
 
+6. Quick rebuild after musdk/dpdk modification:
+
+Export the variables from the begining of the build-vpp.sh
+
+cd ${MUSDK_PATH}
+make -j8 && make install
+
+cd ${DPDK_PATH}
+make -j8 EXTRA_CFLAGS="-fPIC"
+
+cd ${VPP_PATH}
+touch src/plugins/dpdk/device/dpdk.h
+make -j8 build-release PLATFORM=a3k
+
+Now copy the shared library file:
+build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so
+to the vpp_plugins on the target board.
+
+This procedure only rebuilds the parts of libraries which
+are used inside VPP, no modules or kernel are rebuild.
+
+
 Known issue: HW encrypted traffic will crash the application.
