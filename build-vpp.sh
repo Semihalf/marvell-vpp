@@ -170,6 +170,7 @@ git am ${ROOTDIR}/patches/0001-vpp-add-cross-compile-for-a3k.patch
 git tag -a ${BOARD}_${DATE} -m ${BOARD}
 fi
 
+make bootstrap PLATFORM=a3k
 make -j8 build-release PLATFORM=a3k
 
 #### Prepare package
