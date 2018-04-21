@@ -12,6 +12,7 @@ export LIBMUSDK_PATH=${ROOTDIR}/musdk/usr/local
 export DPDK_PATH=${ROOTDIR}/marvell-dpdk
 export MUSDK_PATH=${ROOTDIR}/musdk
 export VPP_PATH=${ROOTDIR}/marvell-vpp
+export BOARD=a3k
 
 export DATE=`date +%Y_%m_%d`
 
@@ -23,7 +24,7 @@ git checkout origin/musdk-armada-17.10 -b musdk-armada-17.10
 cd -
 git clone https://github.com/Semihalf/marvell-dpdk.git ${DPDK_PATH} -b mrvl-dev-a3k
 git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git ${KDIR} -b linux-4.4.52-armada-17.10
-git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b mvneta_on_mrvl_on_master_22_03
+git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b marvell_on_18_01_old
 
 #### Install tools
 sudo apt install gcc-aarch64-linux-gnu
