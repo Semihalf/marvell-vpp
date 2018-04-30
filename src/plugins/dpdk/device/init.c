@@ -401,7 +401,7 @@ dpdk_lib_init (dpdk_main_t * dm)
 	      xd->port_type = port_type_from_speed_capa (&dev_info);
 	      break;
 	    case VNET_DPDK_PMD_MVNETA:
-	    case VNET_DPDK_PMD_MRVL:
+	    case VNET_DPDK_PMD_MVPP2:
 	      xd->port_type = port_type_from_speed_capa (&dev_info);
 	      xd->tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
 	      xd->port_conf.rxmode.hw_strip_crc = 1;

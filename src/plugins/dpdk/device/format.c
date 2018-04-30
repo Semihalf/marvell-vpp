@@ -304,7 +304,7 @@ format_dpdk_device_type (u8 * s, va_list * args)
       dev_type = "Mellanox ConnectX-4 Family";
       break;
 
-    case VNET_DPDK_PMD_MRVL:
+    case VNET_DPDK_PMD_MVPP2:
       dev_type = "Marvell Armada-7/8K Family";
       break;
 
