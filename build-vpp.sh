@@ -137,13 +137,13 @@ make config T=${RTE_TARGET}
 
 if [ "${BOARD}" == "a3k" ]; then
 	sed -i "s/MVNETA_PMD=n/MVNETA_PMD=y/" build/.config
-	sed -i "s/MRVL_PMD=y/MRVL_PMD=n/" build/.config
+	sed -i "s/MVPP2_PMD=y/MVPP2_PMD=n/" build/.config
 else
 	sed -i "s/MVNETA_PMD=y/MVNETA_PMD=n/" build/.config
-	sed -i "s/MRVL_PMD=n/MRVL_PMD=y/" build/.config
+	sed -i "s/MVPP2_PMD=n/MVPP2_PMD=y/" build/.config
 fi
 
-sed -i "s/MRVL_CRYPTO=n/MRVL_CRYPTO=y/" build/.config
+sed -i "s/MVSAM_CRYPTO=n/MVSAM_CRYPTO=y/" build/.config
 sed -i "s/VHOST_NUMA=y/VHOST_NUMA=n/" build/.config
 sed -i "s/NUMA_AWARE_HUGEPAGES=y/NUMA_AWARE_HUGEPAGES=n/" build/.config
 sed -i "s/PMD_TAP=y/PMD_TAP=n/" build/.config
@@ -172,7 +172,7 @@ git tag -a ${BOARD}_${DATE} -m ${BOARD}
 fi
 
 make bootstrap
-make -j8 build-release PLATFORM=a3k
+make -j8 build-release PLATFORM=mrvl
 
 #### Prepare package
 echo -e "\nPREPARE OUTPUT DIRECTORY\n"
@@ -191,9 +191,9 @@ else
 fi
 
 mkdir -p output/lib64/vpp_plugins/
-cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/lib64/vpp_plugins/
+cp ${VPP_PATH}/build-root/install-mrvl-aarch64/vpp/lib64/vpp_plugins/dpdk_plugin.so output/lib64/vpp_plugins/
 
-cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/lib64/lib* output/lib64
+cp ${VPP_PATH}/build-root/install-mrvl-aarch64/vpp/lib64/lib* output/lib64
 
 mkdir -p output/images
 cp ${KDIR}/arch/arm64/boot/Image output/images
@@ -205,7 +205,7 @@ else
 fi
 
 mkdir -p output/bin
-cp ${VPP_PATH}/build-root/install-a3k-aarch64/vpp/bin/vpp* output/bin
+cp ${VPP_PATH}/build-root/install-mrvl-aarch64/vpp/bin/vpp* output/bin
 
 if [ "${BOARD}" == "a3k" ]; then
 	cp scripts/*a3k* output/
