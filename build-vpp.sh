@@ -24,7 +24,7 @@ git checkout origin/musdk-armada-17.10 -b musdk-armada-17.10
 cd -
 git clone https://github.com/Semihalf/marvell-dpdk.git ${DPDK_PATH} -b mrvl-dev-a3k
 git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git ${KDIR} -b linux-4.4.52-armada-17.10
-git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b marvell_on_18_01_old
+git clone https://github.com/Semihalf/marvell-vpp.git ${VPP_PATH} -b cleanup_on_18_01_old
 
 #### Install tools
 sudo apt install gcc-aarch64-linux-gnu
