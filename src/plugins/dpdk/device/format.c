@@ -308,7 +308,7 @@ format_dpdk_device_type (u8 * s, va_list * args)
       dev_type = "Marvell Armada-7/8K Family";
       break;
 
-    case VNET_DPDK_PMD_MVNETA:
+    case VNET_DPDK_PMD_MRVLNA:
       dev_type = "Marvell Armada-3K Family";
       break;
 

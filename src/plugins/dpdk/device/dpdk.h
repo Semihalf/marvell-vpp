@@ -78,7 +78,7 @@ extern vlib_node_registration_t dpdk_input_node;
   _ ("net_mlx4", MLX4)            \
   _ ("net_mlx5", MLX5)            \
   _ ("net_mvpp2", MVPP2)            \
-  _ ("net_mvneta", MVNETA)        \
+  _ ("net_mrvlna", MRVLNA)        \
   _ ("net_dpaa2", DPAA2)          \
   _ ("net_virtio_user", VIRTIO_USER) \
   _ ("net_vhost", VHOST_ETHER)    \
