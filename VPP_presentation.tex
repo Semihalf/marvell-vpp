@@ -1,0 +1,134 @@
+\documentclass{beamer}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+
+
+\usecolortheme{seagull}
+\titlegraphic{\includegraphics[width=\textwidth]{shirtw.png}}
+
+\title{Introduction to VPP}
+\author{Szymon Sliwa}
+\date{11.05.2018}
+
+\setbeamertemplate{section in toc}[sections numbered]
+
+\begin{document}
+\frame{\titlepage}
+
+  \begin{frame}
+  \tableofcontents
+  \end{frame}
+
+\section{What is VPP?}
+  \begin{frame}
+  \frametitle{What is VPP?}
+  \textit{The VPP platform is an extensible framework that provides out-of-the-box production quality switch/router functionality. It is the open source version of Cisco's Vector Packet Processing (VPP) technology: a high performance, packet-processing stack that can run on commodity CPUs. \\
+The benefits of this implementation of VPP are its high performance, proven technology, its modularity and flexibility, and rich feature set...} - \url{https://wiki.fd.io/view/VPP/What_is_VPP\%3F} \\
+  \vfill
+You can find braging about performance and summary of the project aims there
+
+  \end{frame}
+
+\section{Cross compilation}
+  \begin{frame}
+  \frametitle{Cross compilation}
+  As cross compilations for Marvell platforms is quite cumbersome, a script has been 
+  created to automate things. The script and a basic instructions is located at
+  {\tiny\url{https://github.com/Semihalf/marvell-vpp/tree/vpp-build-tool}}
+  \vfill
+    When changes were made only in dpdk or musdk, it may be enough to just
+  recompile dpdk and/or musdk and dpdk\_plugin, detailed instructions are included in the readme
+  of the above repository.
+  \end{frame}
+
+\section{Debug capabilities}
+  \begin{frame}
+  \frametitle{Debug capabilites}
+  If compiled natively, VPP has useful makefile targets which can be listed using
+  \textbf{make} without arguments, amongst others, there are \\
+  \textbf{make build} which builds debug version of VPP \\
+  \textbf{make build-release} which builds release version of VPP \\
+  \textbf{make run} \\
+  \textbf{make run-release} \\
+  \textbf{make debug} \\
+  \textbf{make debug-release}
+
+  The main difference between \textbf{debug} and \textbf{release} versions
+  are the compile time flags, \textbf{release} has "-O2" and
+  \textbf{debug} has "-O0 -DCLIB\_DEBUG" \tiny{("-g" is included in both)}
+  \end{frame}
+  
+\section{Useful CLI commands}
+  \begin{frame}
+  \frametitle{Useful CLI commands}
+  VPP has quite a lot of CLI commands, many of them useful,
+  but it aids a new user in learning them:
+  VPP provides \textit{tab} autocompletion and CLI help.
+  To use the CLI help append \textbf{?} to a paritaly completed command
+  and it will print all the possible expansions of the command with
+  the needed arguments.
+  
+  \vfill
+  
+  \tiny{Also, some command abbreviations work}
+  \end{frame}
+      
+\section{CLI commands for debugging}
+  \begin{frame}
+  \frametitle{CLI commands for debugging}
+  \begin{itemize}
+  \item \textbf{show error} shows error counters, and \textit{all} ipsec packets
+  \item \textbf{trace add dpdk input} \textit{num} adds \textit{num} of packets to trace
+  \item \textbf{show trace} prints the log of the packets traversing the graph 
+          {\tiny very useful debugging configurational issues}
+  \item \textbf{clear trace} clears trace buffers {\tiny the amount of packets to trace is also set to 0}
+  \item \textbf{show version} to be sure the right version of software is tested
+  \end{itemize}
+  \end{frame}
+
+\section{Running VPP}
+  \begin{frame}
+  \frametitle{Running VPP}
+  VPP normally takes parameters from startup.conf, but on Armada platforms we
+  provide it directly as command line parameter. So things like
+  ports, worker amount, worker to port mapping and memory amount 
+  can be changed in the script
+  \textit{start\_with\_crypto\_a3k.sh}. \\
+  \textbf{show int rx} show which worker polls on which port
+  \end{frame}
+
+\section{VPP Architecture}
+  \begin{frame}
+  \frametitle{VPP Architecture}
+  "The VPP platform is built on a ‘packet processing graph’. This modular approach means that anyone can ‘plugin’ new graph nodes. This makes extensibility rather simple, and it means that plugins can be customized for specific purposes..." - \url{https://wiki.fd.io/view/VPP/What_is_VPP\%3F}
+  \end{frame}
+  
+  \begin{frame}
+  \frametitle{VPP Architecture}
+  \framesubtitle{Integration with other frameworks for IO}
+  \begin{itemize}
+  \item VPP is able to communicate with Unix OS'es via TAP interfaces
+  \item VPP is able to communicate with VM via Vhost-user interfaces
+  \item There was an idea to port VPP to ODP, in a FD.io project named ODP4VPP, but it does not support
+        the newest version of VPP, nor the newest version of ODP, and seems pretty much abandoned 
+        {\tiny (as well as the rest of the ODP)}
+  \item There appears to be a plugin working directly on the Marvell PP2 driver in src/plugins/marvell
+  \end{itemize}
+  \end{frame}
+  
+\section{Useful resources}
+  \begin{frame}
+  \frametitle{Useful resources}
+  Generic VPP related stuff (non Marvell specific)
+  \begin{itemize}
+  \item \url{https://wiki.fd.io/view/VPP}
+  \item \url{https://wiki.fd.io/view/Presentations}
+  \item \url{https://www.youtube.com/channel/UCIJ2OP6_i1npoHM39kxvwyg} - fd.io youtube channel, the
+                       videos are quite lengthy, but contain lots of information, sometimes
+                       not avaliable elsewhere
+  \end{itemize}
+  \end{frame}
+
+\end{document}
