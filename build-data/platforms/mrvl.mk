@@ -7,9 +7,9 @@ mrvl_mtune = cortex-A57
 mrvl_march = "armv8-a+fp+simd+crc+crypto"
 mrvl_cross_ldflags = \
 	-Wl,--dynamic-linker=/lib/ld-linux-aarch64.so.1 \
-	-Wl,-rpath=/usr/lib64 \
 	-Wl,-lmusdk \
-	-L$(LIBMUSDK_PATH)/lib
+	-L$(LIBMUSDK_PATH)/lib \
+	-Wl,-rpath=/usr/lib64
 
 mrvl_native_tools = vppapigen
 #mrvl_root_packages = vpp vlib vlib-api vnet svm vpp-api-test
@@ -40,7 +40,8 @@ mrvl_debug_TAG_CFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
 mrvl_debug_TAG_CXXFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
 			-march=$(MARCH) -fPIC -Werror
 mrvl_debug_TAG_LDFLAGS = -g -O2 -DCLIB_DEBUG -fPIC -fstack-protector-all \
-			-march=$(MARCH) -fPIC -Werror
+			-march=$(MARCH) -fPIC -Werror \
+			-Wl,-rpath $$PWD/.libs
 
 # Use -rdynamic is for stack tracing, O0 for debugging....default is O2
 # Use -DCLIB_LOG2_CACHE_LINE_BYTES to change cache line size
@@ -49,7 +50,8 @@ mrvl_TAG_CFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(mrvl_mtune) \
 mrvl_TAG_CXXFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(mrvl_mtune) \
 		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror
 mrvl_TAG_LDFLAGS = -g -O2 -march=$(MARCH) -mcpu=$(mrvl_mtune) \
-		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror
+		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror \
+		-Wl,-rpath=$$PWD/.libs
 
 mrvl_clang_TAG_CFLAGS = -g -O2 -DFORTIFY_SOURCE=2 -fstack-protector -fPIC -Werror
 mrvl_clang_TAG_LDFLAGS = -g -O2 -DFORTIFY_SOURCE=2 -fstack-protector -fPIC -Werror
