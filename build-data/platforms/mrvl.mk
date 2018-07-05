@@ -35,13 +35,13 @@ mrvl_dpdk_target = arm64-armv8a-linuxapp-gcc
 #vlib_configure_args_mrvl = --with-pre-data=256
 
 
-mrvl_debug_TAG_CFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
+mrvl_debug_TAG_CFLAGS = -g -O0 -DCLIB_DEBUG  -fstack-protector-all \
 			-march=$(MARCH) -fPIC -Werror
-mrvl_debug_TAG_CXXFLAGS = -g -O2 -DCLIB_DEBUG  -fstack-protector-all \
+mrvl_debug_TAG_CXXFLAGS = -g -O0 -DCLIB_DEBUG  -fstack-protector-all \
 			-march=$(MARCH) -fPIC -Werror
-mrvl_debug_TAG_LDFLAGS = -g -O2 -DCLIB_DEBUG -fPIC -fstack-protector-all \
+mrvl_debug_TAG_LDFLAGS = -g -O0 -DCLIB_DEBUG -fPIC -fstack-protector-all \
 			-march=$(MARCH) -fPIC -Werror \
-			-Wl,-rpath $$PWD/.libs
+			-Wl,-rpath=$$PWD/.libs
 
 # Use -rdynamic is for stack tracing, O0 for debugging....default is O2
 # Use -DCLIB_LOG2_CACHE_LINE_BYTES to change cache line size
