@@ -184,6 +184,19 @@ dpdk_ring_alloc (struct rte_mempool *mp)
   return 0;
 }
 
+static dpdk_pmd_t
+dpdk_drv_name_to_pmd(const char *name)
+{
+#define _(s,f) else if (!strcmp(name, s))       \
+                 return VNET_DPDK_PMD_##f;
+  if (0)
+    ;
+  foreach_dpdk_pmd
+#undef _
+  else
+    return VNET_DPDK_PMD_UNKNOWN;
+}
+
 static clib_error_t *
 dpdk_lib_init (dpdk_main_t * dm)
 {
@@ -370,23 +383,20 @@ dpdk_lib_init (dpdk_main_t * dm)
 
       if (!xd->pmd)
 	{
-
-
-#define _(s,f) else if (dev_info.driver_name &&                 \
-                        !strcmp(dev_info.driver_name, s))       \
-                 xd->pmd = VNET_DPDK_PMD_##f;
-	  if (0)
-	    ;
-	  foreach_dpdk_pmd
-#undef _
-	    else
-	    xd->pmd = VNET_DPDK_PMD_UNKNOWN;
+	  xd->pmd = dpdk_drv_name_to_pmd(dev_info.driver_name);
 
 	  xd->port_type = VNET_DPDK_PORT_TYPE_UNKNOWN;
 	  xd->nb_rx_desc = DPDK_NB_RX_DESC_DEFAULT;
 	  xd->nb_tx_desc = DPDK_NB_TX_DESC_DEFAULT;
 
-	  switch (xd->pmd)
+	  dpdk_pmd_t real_pmd = xd->pmd;
+	  if (xd->pmd == VNET_DPDK_PMD_LPORT) {
+		  int p_id = rte_eth_lport_phys_id(i);
+		  const char *name = rte_eth_devices[p_id].device->driver->name;
+		  real_pmd = dpdk_drv_name_to_pmd(name);
+	  }
+
+	  switch (real_pmd)
 	    {
 	      /* Drivers with valid speed_capa set */
 	    case VNET_DPDK_PMD_E1000EM:
@@ -411,7 +421,6 @@ dpdk_lib_init (dpdk_main_t * dm)
 	      break;
 	    case VNET_DPDK_PMD_MVNETA:
 	    case VNET_DPDK_PMD_MVPP2:
-	    case VNET_DPDK_PMD_LPORT:
 	      xd->port_type = port_type_from_speed_capa (&dev_info);
 	      xd->tx_conf.txq_flags = ETH_TXQ_FLAGS_IGNORE;
 	      xd->port_conf.rxmode.hw_strip_crc = 1;

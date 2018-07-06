@@ -40,6 +40,7 @@
 #include <rte_sched.h>
 #include <rte_net.h>
 #include <rte_bus_pci.h>
+#include <rte_eth_lport.h>
 
 #include <vnet/unix/pcap.h>
 #include <vnet/devices/devices.h>
