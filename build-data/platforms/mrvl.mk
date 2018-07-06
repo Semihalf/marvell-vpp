@@ -36,21 +36,21 @@ mrvl_dpdk_target = arm64-armv8a-linuxapp-gcc
 
 
 mrvl_debug_TAG_CFLAGS = -g -O0 -DCLIB_DEBUG  -fstack-protector-all \
-			-march=$(MARCH) -fPIC -Werror
+			-march=$(MARCH) -fPIC -Werror -Wno-deprecated-declarations
 mrvl_debug_TAG_CXXFLAGS = -g -O0 -DCLIB_DEBUG  -fstack-protector-all \
-			-march=$(MARCH) -fPIC -Werror
+			-march=$(MARCH) -fPIC -Werror -Wno-deprecated-declarations
 mrvl_debug_TAG_LDFLAGS = -g -O0 -DCLIB_DEBUG -fPIC -fstack-protector-all \
-			-march=$(MARCH) -fPIC -Werror \
+			-march=$(MARCH) -fPIC -Werror -Wno-deprecated-declarations \
 			-Wl,-rpath=$$PWD/.libs
 
 # Use -rdynamic is for stack tracing, O0 for debugging....default is O2
 # Use -DCLIB_LOG2_CACHE_LINE_BYTES to change cache line size
 mrvl_TAG_CFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(mrvl_mtune) \
-		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror
+		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror -Wno-deprecated-declarations
 mrvl_TAG_CXXFLAGS = -g -O2  -march=$(MARCH) -mcpu=$(mrvl_mtune) \
-		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror
+		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror -Wno-deprecated-declarations
 mrvl_TAG_LDFLAGS = -g -O2 -march=$(MARCH) -mcpu=$(mrvl_mtune) \
-		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror \
+		-mtune=$(mrvl_mtune) -funroll-all-loops -fPIC -Werror -Wno-deprecated-declarations \
 		-Wl,-rpath=$$PWD/.libs
 
 mrvl_clang_TAG_CFLAGS = -g -O2 -DFORTIFY_SOURCE=2 -fstack-protector -fPIC -Werror

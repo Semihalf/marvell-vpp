@@ -100,7 +100,7 @@ dpdk_rx_burst (dpdk_main_t * dm, dpdk_device_t * xd, u16 queue_id)
     {
       while (n_left)
 	{
-	  n_this_chunk = rte_eth_rx_burst (xd->device_index, queue_id,
+	  n_this_chunk = rte_eth_rx_burst (xd->device_id, queue_id,
 					   xd->rx_vectors[queue_id] +
 					   n_buffers, n_left);
 	  n_buffers += n_this_chunk;

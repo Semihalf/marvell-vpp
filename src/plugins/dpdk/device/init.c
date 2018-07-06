@@ -104,9 +104,9 @@ dpdk_flag_change (vnet_main_t * vnm, vnet_hw_interface_t * hi, u32 flags)
       if (xd->flags & DPDK_DEVICE_FLAG_ADMIN_UP)
 	{
 	  if (xd->flags & DPDK_DEVICE_FLAG_PROMISC)
-	    rte_eth_promiscuous_enable (xd->device_index);
+	    rte_eth_promiscuous_enable (xd->device_id);
 	  else
-	    rte_eth_promiscuous_disable (xd->device_index);
+	    rte_eth_promiscuous_disable (xd->device_id);
 	}
     }
   else if (ETHERNET_INTERFACE_FLAG_CONFIG_MTU (flags))
@@ -273,7 +273,7 @@ dpdk_lib_init (dpdk_main_t * dm)
       vnet_buffer (bt)->sw_if_index[VLIB_TX] = (u32) ~ 0;
     }
 
-  for (i = 0; i < nports; i++)
+  RTE_ETH_FOREACH_DEV(i)
     {
       u8 addr[6];
       u8 vlan_strip = 0;
@@ -516,7 +516,7 @@ dpdk_lib_init (dpdk_main_t * dm)
 	dpdk_device_lock_init (xd);
 
       xd->device_index = xd - dm->devices;
-      ASSERT (i == xd->device_index);
+      xd->device_id = i;
       xd->per_interface_next_index = ~0;
 
       /* assign interface to input thread */
@@ -710,10 +710,10 @@ dpdk_lib_init (dpdk_main_t * dm)
       if (vlan_strip)
 	{
 	  int vlan_off;
-	  vlan_off = rte_eth_dev_get_vlan_offload (xd->device_index);
+	  vlan_off = rte_eth_dev_get_vlan_offload (xd->device_id);
 	  vlan_off |= ETH_VLAN_STRIP_OFFLOAD;
 	  xd->port_conf.rxmode.hw_vlan_strip = vlan_off;
-	  if (rte_eth_dev_set_vlan_offload (xd->device_index, vlan_off) == 0)
+	  if (rte_eth_dev_set_vlan_offload (xd->device_id, vlan_off) == 0)
 	    clib_warning ("VLAN strip enabled for interface\n");
 	  else
 	    clib_warning ("VLAN strip cannot be supported by interface\n");
@@ -722,7 +722,7 @@ dpdk_lib_init (dpdk_main_t * dm)
       hi->max_l3_packet_bytes[VLIB_RX] = hi->max_l3_packet_bytes[VLIB_TX] =
 	xd->port_conf.rxmode.max_rx_pkt_len - sizeof (ethernet_header_t);
 
-      rte_eth_dev_set_mtu (xd->device_index, mtu);
+      rte_eth_dev_set_mtu (xd->device_id, mtu);
     }
 
   if (nb_desc > dm->conf->num_mbufs)
@@ -1355,7 +1355,7 @@ dpdk_update_link_state (dpdk_device_t * xd, f64 now)
 
   xd->time_last_link_update = now ? now : xd->time_last_link_update;
   memset (&xd->link, 0, sizeof (xd->link));
-  rte_eth_link_get_nowait (xd->device_index, &xd->link);
+  rte_eth_link_get_nowait (xd->device_id, &xd->link);
 
   if (LINK_STATE_ELOGS)
     {
@@ -1521,7 +1521,7 @@ dpdk_process (vlib_main_t * vm, vlib_node_runtime_t * rt, vlib_frame_t * f)
 	      {
 		u8 addr[6];
 		dpdk_portid_t slink[16];
-		int nlink = rte_eth_bond_slaves_get (i, slink, 16);
+		int nlink = rte_eth_bond_slaves_get (xd->device_id, slink, 16);
 		if (nlink > 0)
 		  {
 		    vnet_hw_interface_t *bhi;
@@ -1534,9 +1534,9 @@ dpdk_process (vlib_main_t * vm, vlib_node_runtime_t * rt, vlib_frame_t * f)
 
 		    /* Set MAC of bounded interface to that of 1st slave link */
 		    clib_warning ("Set MAC for bond port %d BondEthernet%d",
-				  i, xd->port_id);
+				  xd->device_id, xd->port_id);
 		    rv = rte_eth_bond_mac_address_set
-		      (i, (struct ether_addr *) addr);
+		      (xd->device_id, (struct ether_addr *) addr);
 		    if (rv)
 		      clib_warning ("Set MAC addr failure rv=%d", rv);
 

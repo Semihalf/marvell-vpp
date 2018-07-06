@@ -224,7 +224,7 @@ format_dpdk_device_name (u8 * s, va_list * args)
       break;
 
     case VNET_DPDK_PORT_TYPE_AF_PACKET:
-      rte_eth_dev_info_get (i, &dev_info);
+      rte_eth_dev_info_get (dm->devices[i].device_id, &dev_info);
       return format (s, "af_packet%d", dm->devices[i].port_id);
 
     case VNET_DPDK_PORT_TYPE_VIRTIO_USER:
@@ -241,7 +241,7 @@ format_dpdk_device_name (u8 * s, va_list * args)
       break;
     }
 
-  rte_eth_dev_info_get (i, &dev_info);
+  rte_eth_dev_info_get (dm->devices[i].device_id, &dev_info);
 
   if (dev_info.pci_dev)
     ret = format (s, devname_format, device_name, dev_info.pci_dev->addr.bus,
@@ -380,7 +380,7 @@ format_dpdk_link_status (u8 * s, va_list * args)
   s = format (s, "%s ", l->link_status ? "up" : "down");
   if (l->link_status)
     {
-      u32 promisc = rte_eth_promiscuous_get (xd->device_index);
+      u32 promisc = rte_eth_promiscuous_get (xd->device_id);
 
       s = format (s, "%s duplex ", (l->link_duplex == ETH_LINK_FULL_DUPLEX) ?
 		  "full" : "half");
@@ -473,10 +473,10 @@ format_dpdk_device (u8 * s, va_list * args)
   dpdk_update_link_state (xd, now);
 
   s = format (s, "%U\n%Ucarrier %U",
-	      format_dpdk_device_type, xd->device_index,
+	      format_dpdk_device_type, dev_instance,
 	      format_white_space, indent + 2, format_dpdk_link_status, xd);
 
-  rte_eth_dev_info_get (xd->device_index, &di);
+  rte_eth_dev_info_get (xd->device_id, &di);
 
   if (verbose > 1 && xd->flags & DPDK_DEVICE_FLAG_PMD)
     {
@@ -486,7 +486,7 @@ format_dpdk_device (u8 * s, va_list * args)
       int retval;
 
       rss_conf.rss_key = 0;
-      retval = rte_eth_dev_rss_hash_conf_get (xd->device_index, &rss_conf);
+      retval = rte_eth_dev_rss_hash_conf_get (xd->device_id, &rss_conf);
       if (retval < 0)
 	clib_warning ("rte_eth_dev_rss_hash_conf_get returned %d", retval);
       pci = di.pci_dev;
@@ -510,9 +510,9 @@ format_dpdk_device (u8 * s, va_list * args)
       s =
 	format (s, "%Upromiscuous:       unicast %s all-multicast %s\n",
 		format_white_space, indent + 2,
-		rte_eth_promiscuous_get (xd->device_index) ? "on" : "off",
-		rte_eth_allmulticast_get (xd->device_index) ? "on" : "off");
-      vlan_off = rte_eth_dev_get_vlan_offload (xd->device_index);
+		rte_eth_promiscuous_get (xd->device_id) ? "on" : "off",
+		rte_eth_allmulticast_get (xd->device_id) ? "on" : "off");
+      vlan_off = rte_eth_dev_get_vlan_offload (xd->device_id);
       s = format (s, "%Uvlan offload:      strip %s filter %s qinq %s\n",
 		  format_white_space, indent + 2,
 		  vlan_off & ETH_VLAN_STRIP_OFFLOAD ? "on" : "off",
@@ -558,9 +558,9 @@ format_dpdk_device (u8 * s, va_list * args)
   u32 i = 0;
   struct rte_eth_xstat *xstat, *last_xstat;
   struct rte_eth_xstat_name *xstat_names = 0;
-  int len = rte_eth_xstats_get_names (xd->device_index, NULL, 0);
+  int len = rte_eth_xstats_get_names (xd->device_id, NULL, 0);
   vec_validate (xstat_names, len - 1);
-  rte_eth_xstats_get_names (xd->device_index, xstat_names, len);
+  rte_eth_xstats_get_names (xd->device_id, xstat_names, len);
 
   ASSERT (vec_len (xd->xstats) == vec_len (xd->last_cleared_xstats));
 

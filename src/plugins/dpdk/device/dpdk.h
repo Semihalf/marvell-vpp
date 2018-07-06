@@ -162,7 +162,8 @@ typedef struct
   volatile u32 **lockp;
 
   /* Instance ID */
-  dpdk_portid_t device_index;
+  u16           device_index;
+  dpdk_portid_t device_id;
 
   u32 hw_if_index;
   u32 vlib_sw_if_index;

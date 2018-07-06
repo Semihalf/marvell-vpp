@@ -301,7 +301,7 @@ dpdk_port_setup_hqos (dpdk_device_t * xd, dpdk_device_config_hqos_t * hqos)
   if (hqos->port.name == NULL)
     return clib_error_return (0, "HQoS%u: strdup err", xd->device_index);
 
-  hqos->port.socket = rte_eth_dev_socket_id (xd->device_index);
+  hqos->port.socket = rte_eth_dev_socket_id (xd->device_id);
   if (hqos->port.socket == SOCKET_ID_ANY)
     hqos->port.socket = 0;
 
@@ -411,7 +411,7 @@ dpdk_hqos_thread_internal_hqos_dbg_bypass (vlib_main_t * vm)
       dpdk_device_t *xd = vec_elt_at_index (dm->devices, dq->device);
 
       dpdk_device_hqos_per_hqos_thread_t *hqos = xd->hqos_ht;
-      u32 device_index = xd->device_index;
+      u32 device_id = xd->device_id;
       u16 queue_id = dq->queue_id;
 
       struct rte_mbuf **pkts_enq = hqos->pkts_enq;
@@ -440,7 +440,7 @@ dpdk_hqos_thread_internal_hqos_dbg_bypass (vlib_main_t * vm)
 	  /* HWQ TX enqueue when burst available */
 	  if (pkts_enq_len >= hqos->hqos_burst_enq)
 	    {
-	      u32 n_pkts = rte_eth_tx_burst (device_index,
+	      u32 n_pkts = rte_eth_tx_burst (device_id,
 					     (uint16_t) queue_id,
 					     pkts_enq,
 					     (uint16_t) pkts_enq_len);
@@ -498,7 +498,7 @@ dpdk_hqos_thread_internal (vlib_main_t * vm)
       dpdk_device_t *xd = vec_elt_at_index (dm->devices, dq->device);
 
       dpdk_device_hqos_per_hqos_thread_t *hqos = xd->hqos_ht;
-      u32 device_index = xd->device_index;
+      u32 device_id = xd->device_id;
       u16 queue_id = dq->queue_id;
 
       struct rte_mbuf **pkts_enq = hqos->pkts_enq;
@@ -563,7 +563,7 @@ dpdk_hqos_thread_internal (vlib_main_t * vm)
 					       hqos->hqos_burst_deq);
 
 	for (n_pkts = 0; n_pkts < pkts_deq_len;)
-	  n_pkts += rte_eth_tx_burst (device_index,
+	  n_pkts += rte_eth_tx_burst (device_id,
 				      (uint16_t) queue_id,
 				      &pkts_deq[n_pkts],
 				      (uint16_t) (pkts_deq_len - n_pkts));
